@@ -1,0 +1,9 @@
+name = "mock-interview-bot"
+main = "./.wrangler/tmp/bundle-xYBIrL/index.js"
+compatibility_date = "2023-12-01"
+
+[site]
+bucket = "./out"
+
+[build]
+command = "pnpm run build"
