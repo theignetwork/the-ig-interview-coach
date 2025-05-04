@@ -1,12 +1,13 @@
-import OpenAI from "openai";
+import { Handler } from "@netlify/functions";
+import Anthropic from "@anthropic-ai/sdk";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY!,
 });
 
-export const handler = async (event: any) => {
+export const handler: Handler = async (event) => {
   try {
-    const { jobDescription, resumeSummary } = JSON.parse(event.body || "{}");
+    const { jobDescription } = JSON.parse(event.body || "{}");
 
     if (!jobDescription) {
       return {
@@ -15,32 +16,35 @@ export const handler = async (event: any) => {
       };
     }
 
-    const userPrompt = `Job Description:\n${jobDescription}` + 
-      (resumeSummary ? `\n\nResume Summary:\n${resumeSummary}` : "");
+    const prompt = `
+You are a friendly, expert job interviewer. Based on the job description below, write one strong, customized interview question to assess the candidate’s fit for the role. It should be role-specific and help uncover skills, behavior, or motivation.
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4-turbo", // GPT-4.1 as of April 2024
+Job Description:
+${jobDescription}
+
+Respond ONLY with the interview question and nothing else.
+`;
+
+    const response = await anthropic.messages.create({
+      model: "claude-3-opus-20240229",
+      max_tokens: 200,
+      temperature: 0.6,
       messages: [
         {
-          role: "system",
-          content: `You are a world-class job interview coach and hiring strategist. Based on the provided job description—and, if available, the candidate’s resume summary—generate 5 customized interview questions. Use a mix of behavioral, situational, and technical questions appropriate to the role’s seniority and industry. Keep questions concise but rich in insight: they should reveal real-world problem solving, technical depth, cultural fit, and career motivations. For leadership roles, include at least one leadership-focused question. Questions must be clear, role-specific, and designed to elicit thoughtful, story-driven responses.`,
-        },
-        {
           role: "user",
-          content: userPrompt,
+          content: prompt.trim(),
         },
       ],
-      temperature: 0.7,
     });
 
-    const questions = completion.choices[0].message.content;
+    const question = response.content[0].text.trim();
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ questions }),
+      body: JSON.stringify({ question }),
     };
-  } catch (err: any) {
-    console.error("Error generating questions:", err.message);
+  } catch (error: any) {
+    console.error("Claude error:", error.message);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: "Internal Server Error" }),
