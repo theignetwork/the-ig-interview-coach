@@ -15,22 +15,20 @@ function InterviewContent() {
   const [jobDescription, setJobDescription] = useState<string | null>(null);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const pastedJob = localStorage.getItem("pastedJobDescription");
+    const pastedJob = localStorage.getItem("pastedJobDescription");
+    if (!pastedJob) {
+      setError("Missing job description.");
+      setLoading(false);
+    } else {
       setJobDescription(pastedJob);
     }
   }, []);
 
   useEffect(() => {
-    if (!jobDescription) {
-      setError("Missing job description.");
-      setLoading(false);
-      return;
-    }
+    if (!jobDescription) return;
 
     async function fetchQuestion() {
       try {
-        setLoading(true);
         const res = await fetch("/.netlify/functions/generate-questions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -88,7 +86,7 @@ function InterviewContent() {
           <div className="flex justify-center">
             <button
               onClick={() => router.push("/")}
-              className="px-4 py-2 bg-teal-500 text-white rounded-md hover:bg-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 focus:ring-offset-slate-800"
+              className="px-4 py-2 bg-teal-500 text-white rounded-md hover:bg-teal-600"
             >
               Go Back
             </button>
@@ -137,25 +135,10 @@ function InterviewContent() {
 
 export default function InterviewPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex flex-col items-center justify-center min-h-screen p-4">
-          <div className="w-full max-w-md p-8 bg-slate-800 rounded-lg shadow-md border border-slate-700">
-            <h1 className="text-2xl font-bold text-center text-white mb-6">
-              Loading Interview
-            </h1>
-            <div className="w-full bg-slate-700 rounded-full h-2.5 mb-4">
-              <div
-                className="bg-teal-500 h-2.5 rounded-full animate-pulse"
-                style={{ width: "70%" }}
-              ></div>
-            </div>
-          </div>
-        </div>
-      }
-    >
+    <Suspense fallback={<p className="text-white">Loading interview...</p>}>
       <InterviewContent />
     </Suspense>
   );
 }
+
 
