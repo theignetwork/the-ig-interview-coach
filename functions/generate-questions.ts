@@ -1,23 +1,13 @@
 import { Anthropic } from "@anthropic-ai/sdk";
 
 const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY!,
+  apiKey: process.env.ANTHROPIC_API_KEY,
 });
-
-// Try to pull out a title (after "Role:" or "Position:")
-// and a company (after "at" or "for")
-function extractTitleAndCompany(text: string) {
-  const titleMatch = text.match(/(?:Role|Position):\s*(.+)/i);
-  const companyMatch = text.match(/(?:at|for)\s+([A-Z][\w &]+)/i);
-  return {
-    jobTitle: titleMatch ? titleMatch[1].trim() : "Custom Role",
-    company: companyMatch ? companyMatch[1].trim() : "Company Name",
-  };
-}
 
 export const handler = async (event: any) => {
   try {
     const { jobDescription } = JSON.parse(event.body || "{}");
+
     if (!jobDescription || jobDescription.trim().length < 10) {
       return {
         statusCode: 400,
@@ -25,56 +15,47 @@ export const handler = async (event: any) => {
       };
     }
 
-    // Build the prompt
-    const prompt = [
-      "You are a sharp but friendly recruiter.",
-      "Based ONLY on the job description below, ask ONE high-impact interview question",
-      "that would reveal whether the candidate can truly succeed in the role.",
-      "Write just the question, no preamble.",
-      "",
-      "Job Description:",
-      jobDescription,
-      "",
-      "Question:",
-    ].join("\n");
+    const prompt = `You are a friendly and sharp AI recruiter. Based on the job description below, ask ONE thoughtful interview question to evaluate the candidate's real-world fit. Keep the tone conversational, not robotic.
 
-    // Call Claude
-    const resp = await anthropic.messages.create({
+Job Description:
+${jobDescription}
+
+Question:`;
+
+    const completion = await anthropic.messages.create({
       model: "claude-3-haiku-20240307",
+      max_tokens: 300,
       temperature: 0.7,
-      max_tokens: 200,
-      messages: [{ role: "user", content: prompt }],
+      messages: [
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
     });
 
-    const question = resp?.content?.[0]?.text?.trim() || "";
-    if (!question) {
+    const output = completion.content?.[0]?.text?.trim();
+
+    if (!output) {
       return {
         statusCode: 500,
-        body: JSON.stringify({ error: "Claude returned no question." }),
+        body: JSON.stringify({ error: "Claude returned no output." }),
       };
     }
 
-    // Extract title/company from the original description
-    const { jobTitle, company } = extractTitleAndCompany(jobDescription);
-
-    // Return as an array
     return {
       statusCode: 200,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        questions: [question],
-        jobTitle,
-        company,
-      }),
+      body: JSON.stringify({ question: output }),
     };
   } catch (err: any) {
-    console.error("Claude error:", err);
+    console.error("Claude error:", err?.message || err);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: "Internal Server Error" }),
     };
   }
 };
+
 
 
 
