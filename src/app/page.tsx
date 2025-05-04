@@ -1,3 +1,4 @@
+// /app/page.tsx (Home)
 "use client";
 
 import { useState } from "react";
@@ -16,10 +17,9 @@ export default function Home() {
     }
     setError(null);
     setBusy(true);
-    // put the JD directly in the URL (safer than localStorage)
-    router.push(
-      "/interview?job=" + encodeURIComponent(jobText.trim())
-    );
+
+    // Embed the full description in the URL:
+    router.push(`/interview?job=${encodeURIComponent(jobText.trim())}`);
   };
 
   return (
@@ -58,5 +58,6 @@ export default function Home() {
     </main>
   );
 }
+
 
 
