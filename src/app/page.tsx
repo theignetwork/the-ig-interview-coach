@@ -1,30 +1,41 @@
+// 🔁 Home Page (page.tsx)
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { FileUpload } from '@/components/upload/FileUpload';
 
 export default function Home() {
   const router = useRouter();
-  const [jobText, setJobText] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async () => {
+  const handleTextSelected = async (text: string) => {
     try {
       setIsProcessing(true);
       setError(null);
 
-      // Save to localStorage
-      localStorage.setItem("pastedJobDescription", jobText);
+      const res = await fetch("/.netlify/functions/generate-questions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobDescription: text }),
+      });
 
-      // Generate a simple doc ID
-      const mockDocumentId = `doc_${Date.now()}`;
+      const data = await res.json();
 
-      // Redirect to interview page
-      router.push(`/interview?documentId=${mockDocumentId}`);
+      if (!data.question) {
+        throw new Error("Claude returned no question.");
+      }
+
+      // Save everything in localStorage
+      localStorage.setItem("question", data.question);
+      localStorage.setItem("jobTitle", data.jobTitle || "Custom Role");
+      localStorage.setItem("company", data.company || "Company Name");
+
+      router.push("/interview");
     } catch (err) {
-      console.error("Error preparing interview:", err);
-      setError("Something went wrong. Please try again.");
+      console.error("Error generating question:", err);
+      setError("Something went wrong while generating interview questions.");
     } finally {
       setIsProcessing(false);
     }
@@ -47,21 +58,21 @@ export default function Home() {
             Paste Job Description
           </h2>
 
-          <textarea
-            value={jobText}
-            onChange={(e) => setJobText(e.target.value)}
-            placeholder="Paste job description here..."
-            rows={10}
-            className="w-full p-4 rounded-md bg-slate-900 text-white border border-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-500"
-          />
+          <FileUpload onTextSelected={handleTextSelected} />
 
-          <button
-            onClick={handleSubmit}
-            disabled={!jobText.trim() || isProcessing}
-            className="mt-4 px-6 py-2 bg-teal-500 text-white rounded-md hover:bg-teal-600 disabled:opacity-50"
-          >
-            {isProcessing ? "Submitting..." : "Submit Text"}
-          </button>
+          {isProcessing && (
+            <div className="mt-6">
+              <div className="w-full bg-slate-700 rounded-full h-2.5 mb-4">
+                <div
+                  className="bg-teal-500 h-2.5 rounded-full animate-pulse"
+                  style={{ width: "70%" }}
+                ></div>
+              </div>
+              <p className="text-center text-slate-300">
+                Analyzing job description and generating questions...
+              </p>
+            </div>
+          )}
 
           {error && (
             <div className="mt-6 p-4 bg-red-900/50 text-red-200 rounded-md border border-red-700">
@@ -71,7 +82,10 @@ export default function Home() {
         </div>
 
         <div className="mt-8 bg-slate-800 p-8 rounded-lg shadow-md border border-slate-700">
-          <h2 className="text-2xl font-bold text-white mb-4">How It Works</h2>
+          <h2 className="text-2xl font-bold text-white mb-4">
+            How It Works
+          </h2>
+
           <ol className="space-y-4 list-decimal list-inside text-slate-300">
             <li>Paste a job description into the box</li>
             <li>Our AI analyzes it and generates relevant interview questions</li>
