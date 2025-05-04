@@ -15,7 +15,7 @@ export const handler = async (event: any) => {
       };
     }
 
-    const prompt = `You are a friendly and sharp AI recruiter. Based on the job description below, ask ONE thoughtful interview question to evaluate the candidate's real-world fit. Keep the tone conversational, not robotic.
+   const prompt = `You are an AI interview assistant. Given a job description, return only ONE clear, concise, thoughtful interview question that evaluates a candidate's real-world fit. Do not introduce the question. Do not include chit-chat or extra commentary. Return only the question itself.
 
 Job Description:
 ${jobDescription}
