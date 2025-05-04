@@ -1,18 +1,8 @@
-// /netlify/functions/generate-questions.ts
 import { Anthropic } from "@anthropic-ai/sdk";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
-
-function extractTitleAndCompany(text: string) {
-  const titleMatch = text.match(/(Role|Position):?\s*(.+)/i);
-  const companyMatch = text.match(/(?:at|for)\s+([A-Z][a-zA-Z0-9& ]+)/);
-  return {
-    jobTitle: titleMatch ? titleMatch[2].trim() : "Custom Role",
-    company: companyMatch ? companyMatch[1].trim() : "Company Name",
-  };
-}
 
 export const handler = async (event: any) => {
   try {
@@ -25,16 +15,11 @@ export const handler = async (event: any) => {
       };
     }
 
-    const prompt = `You are a friendly and sharp AI recruiter. Based on the job description below, ask ONE thoughtful interview question to evaluate the candidate's real-world fit. Keep the tone conversational, not robotic.
-
-Job Description:
-${jobDescription}
-
-Question:`;
+    const prompt = `You are a sharp but friendly AI recruiter. Based on the job description below, generate a list of 3 thoughtful and realistic interview questions. Each question should be on a new line and sound like something a real interviewer would ask.\n\nJob Description:\n${jobDescription}\n\nQuestions:\n1.`;
 
     const completion = await anthropic.messages.create({
       model: "claude-3-haiku-20240307",
-      max_tokens: 300,
+      max_tokens: 500,
       temperature: 0.7,
       messages: [
         {
@@ -44,24 +29,23 @@ Question:`;
       ],
     });
 
-    const output = completion.content?.[0]?.text?.trim();
+    const rawOutput = completion?.content?.[0]?.text?.trim();
 
-    if (!output) {
+    if (!rawOutput) {
       return {
         statusCode: 500,
         body: JSON.stringify({ error: "Claude returned no output." }),
       };
     }
 
-    const { jobTitle, company } = extractTitleAndCompany(jobDescription);
+    const questions = rawOutput
+      .split("\n")
+      .map((line) => line.replace(/^\d+\.\s*/, "").trim())
+      .filter((line) => line.length > 0);
 
     return {
       statusCode: 200,
-      body: JSON.stringify({
-        questions: [output],
-        jobTitle,
-        company,
-      }),
+      body: JSON.stringify({ questions }),
     };
   } catch (err: any) {
     console.error("Claude error:", err?.message || err);
@@ -71,6 +55,7 @@ Question:`;
     };
   }
 };
+
 
 
 
