@@ -1,17 +1,20 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { Handler } from '@netlify/functions';
 import Anthropic from '@anthropic-ai/sdk';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
 });
 
-export async function POST(req: NextRequest) {
+const handler: Handler = async (event) => {
   try {
-    const body = await req.json();
+    const body = JSON.parse(event.body || '{}');
     const { originalQuestion, userAnswer } = body;
 
     if (!originalQuestion || !userAnswer) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: 'Missing input' })
+      };
     }
 
     const prompt = `
@@ -30,19 +33,26 @@ Candidate's Answer:
 ${userAnswer}
 `;
 
-    const completion = await anthropic.messages.create({
+    const response = await anthropic.messages.create({
       model: "claude-3-opus-20240229",
       max_tokens: 200,
       temperature: 0.7,
-      messages: [
-        { role: "user", content: prompt }
-      ]
+      messages: [{ role: "user", content: prompt }]
     });
 
-    const followUp = completion.content[0].text.trim();
-    return NextResponse.json({ followUpQuestion: followUp });
+    const followUpQuestion = response.content[0].text.trim();
+
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ followUpQuestion })
+    };
   } catch (err) {
-    console.error("Claude follow-up error:", err);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    console.error("Follow-up error:", err);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: 'Failed to generate follow-up.' })
+    };
   }
-}
+};
+
+export { handler };
