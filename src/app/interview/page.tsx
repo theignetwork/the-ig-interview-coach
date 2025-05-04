@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { InterviewSession } from "@/components/interview/InterviewSession";
 
@@ -8,43 +8,53 @@ function InterviewContent() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [questions, setQuestions] = useState<any[]>([]);
-  const [jobData, setJobData] = useState<any>(null);
+  const [question, setQuestion] = useState<string | null>(null);
+  const [jobTitle, setJobTitle] = useState<string>("Custom Role");
+  const [company, setCompany] = useState<string>("Company Name");
   const [sessionId, setSessionId] = useState<string>("");
+  const [jobDescription, setJobDescription] = useState<string | null>(null);
 
   useEffect(() => {
-    const question = localStorage.getItem("interviewQuestion");
-    const jobTitle = localStorage.getItem("jobTitle") || "Unknown Role";
-    const company = localStorage.getItem("company") || "Unknown Company";
+    if (typeof window !== "undefined") {
+      const pastedJob = localStorage.getItem("pastedJobDescription");
+      setJobDescription(pastedJob);
+    }
+  }, []);
 
-    if (!question) {
-      setError("Missing interview question.");
+  useEffect(() => {
+    if (!jobDescription) {
+      setError("Missing job description.");
       setLoading(false);
       return;
     }
 
-    const parsedQuestion = {
-      id: "q1",
-      text: question,
-      type: "general",
-      skill: "unspecified",
-      difficulty: "medium",
-    };
+    async function fetchQuestion() {
+      try {
+        setLoading(true);
+        const res = await fetch("/.netlify/functions/generate-questions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jobDescription }),
+        });
 
-    const job = {
-      jobTitle,
-      company,
-      requiredSkills: [],
-      responsibilities: [],
-      qualifications: [],
-      companyValues: [],
-    };
+        const data = await res.json();
 
-    setQuestions([parsedQuestion]);
-    setJobData(job);
-    setSessionId(`session_${Date.now()}`);
-    setLoading(false);
-  }, []);
+        if (!data.question) throw new Error("Missing interview question.");
+
+        setQuestion(data.question);
+        setJobTitle(data.jobTitle || "Custom Role");
+        setCompany(data.company || "Company Name");
+        setSessionId(`session_${Date.now()}`);
+        setLoading(false);
+      } catch (err) {
+        console.error("Fetch error:", err);
+        setError("Failed to generate interview question. Please try again.");
+        setLoading(false);
+      }
+    }
+
+    fetchQuestion();
+  }, [jobDescription]);
 
   if (loading) {
     return (
@@ -53,23 +63,28 @@ function InterviewContent() {
           <h1 className="text-2xl font-bold text-center text-white mb-6">
             Preparing Your Interview
           </h1>
-          <div className="w-full bg-slate-700 rounded-full h-2.5 mb-4">
-            <div className="bg-teal-500 h-2.5 rounded-full animate-pulse" style={{ width: "70%" }}></div>
+          <div className="space-y-4">
+            <div className="w-full bg-slate-700 rounded-full h-2.5 mb-4">
+              <div
+                className="bg-teal-500 h-2.5 rounded-full animate-pulse"
+                style={{ width: "70%" }}
+              ></div>
+            </div>
+            <p className="text-center text-slate-300">
+              Analyzing job description and generating a thoughtful interview question...
+            </p>
           </div>
-          <p className="text-center text-slate-300">
-            Loading question and job details...
-          </p>
         </div>
       </div>
     );
   }
 
-  if (error) {
+  if (error || !question) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
         <div className="w-full max-w-md p-8 bg-slate-800 rounded-lg shadow-md border border-slate-700">
           <h1 className="text-2xl font-bold text-center text-red-400 mb-6">Error</h1>
-          <p className="text-center text-slate-300 mb-6">{error}</p>
+          <p className="text-center text-slate-300 mb-6">{error || "Missing interview question."}</p>
           <div className="flex justify-center">
             <button
               onClick={() => router.push("/")}
@@ -83,23 +98,38 @@ function InterviewContent() {
     );
   }
 
+  const parsedQuestion = {
+    id: "q1",
+    text: question,
+    type: "general",
+    skill: "unspecified",
+    difficulty: "medium",
+  };
+
+  const jobData = {
+    jobTitle,
+    company,
+    requiredSkills: [],
+    responsibilities: [],
+    qualifications: [],
+    companyValues: [],
+  };
+
   return (
     <div className="min-h-screen py-8 px-4">
       <div className="max-w-4xl mx-auto">
         <header className="mb-8">
           <h1 className="text-3xl font-bold text-white">The IG Interview Coach</h1>
           <p className="text-slate-300 mt-2">
-            Position: {jobData?.jobTitle} at {jobData?.company}
+            Position: {jobTitle} at {company}
           </p>
         </header>
 
-        {questions.length > 0 && jobData && (
-          <InterviewSession
-            questions={questions}
-            jobData={jobData}
-            sessionId={sessionId}
-          />
-        )}
+        <InterviewSession
+          questions={[parsedQuestion]}
+          jobData={jobData}
+          sessionId={sessionId}
+        />
       </div>
     </div>
   );
@@ -107,22 +137,25 @@ function InterviewContent() {
 
 export default function InterviewPage() {
   return (
-    <Suspense fallback={
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <div className="w-full max-w-md p-8 bg-slate-800 rounded-lg shadow-md border border-slate-700">
-          <h1 className="text-2xl font-bold text-center text-white mb-6">
-            Loading Interview
-          </h1>
-          <div className="w-full bg-slate-700 rounded-full h-2.5 mb-4">
-            <div
-              className="bg-teal-500 h-2.5 rounded-full animate-pulse"
-              style={{ width: "70%" }}
-            ></div>
+    <Suspense
+      fallback={
+        <div className="flex flex-col items-center justify-center min-h-screen p-4">
+          <div className="w-full max-w-md p-8 bg-slate-800 rounded-lg shadow-md border border-slate-700">
+            <h1 className="text-2xl font-bold text-center text-white mb-6">
+              Loading Interview
+            </h1>
+            <div className="w-full bg-slate-700 rounded-full h-2.5 mb-4">
+              <div
+                className="bg-teal-500 h-2.5 rounded-full animate-pulse"
+                style={{ width: "70%" }}
+              ></div>
+            </div>
           </div>
         </div>
-      </div>
-    }>
+      }
+    >
       <InterviewContent />
     </Suspense>
   );
 }
+
