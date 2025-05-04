@@ -46,18 +46,17 @@ function InterviewContent() {
 
         const data = await res.json();
 
-        if (!data.questions) throw new Error("No questions returned from Claude");
+        if (!data.question) throw new Error("No question returned from Claude");
 
-        const parsedQuestions = data.questions
-          .split("\n")
-          .filter((line: string) => line.trim())
-          .map((text: string, index: number) => ({
-            id: `q${index + 1}`,
-            text: text.replace(/^\d+\.\s*/, "").trim(),
+        const parsedQuestions = [
+          {
+            id: "q1",
+            text: data.question.trim(),
             type: "unknown",
             skill: "unspecified",
             difficulty: "medium",
-          }));
+          },
+        ];
 
         const fakeJobData = {
           jobTitle: "Custom Role",
@@ -97,7 +96,7 @@ function InterviewContent() {
               ></div>
             </div>
             <p className="text-center text-slate-300">
-              Analyzing job description and generating relevant interview questions...
+              Analyzing job description and generating a tailored interview question...
             </p>
           </div>
         </div>
@@ -130,7 +129,8 @@ function InterviewContent() {
         <header className="mb-8">
           <h1 className="text-3xl font-bold text-white">The IG Interview Coach</h1>
           <p className="text-slate-300 mt-2">
-            Position: {jobData?.jobTitle || "Software Engineer"} at {jobData?.company || "Company"}
+            Position: {jobData?.jobTitle || "Software Engineer"} at{" "}
+            {jobData?.company || "Company"}
           </p>
         </header>
 
@@ -170,3 +170,4 @@ export default function InterviewPage() {
     </Suspense>
   );
 }
+
