@@ -33,7 +33,7 @@ export const handler = async (event: any) => {
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ question: output }),
+      body: JSON.stringify({ questions: output }),
     };
   } catch (err: any) {
     console.error("Claude error:", err?.message || err);
