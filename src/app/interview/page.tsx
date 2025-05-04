@@ -6,41 +6,30 @@ import { InterviewSession } from "@/components/interview/InterviewSession";
 
 function InterviewContent() {
   const router = useRouter();
-  const [jobDescription, setJobDescription] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [questions, setQuestions] = useState<any[]>([]);
   const [jobData, setJobData] = useState<any>(null);
   const [sessionId, setSessionId] = useState<string>("");
 
-  // Extract job description from URL
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const searchParams = new URLSearchParams(window.location.search);
-      const rawJob = searchParams.get("job");
+    if (typeof window === "undefined") return;
 
-      if (!rawJob) {
-        setError("No job description provided.");
-        setLoading(false);
-        return;
-      }
+    const searchParams = new URLSearchParams(window.location.search);
+    const rawJobDescription = searchParams.get("job");
 
-      try {
-        const decoded = decodeURIComponent(rawJob);
-        setJobDescription(decoded);
-      } catch (err) {
-        setError("Failed to decode job description.");
-        setLoading(false);
-      }
+    if (!rawJobDescription) {
+      setError("No job description provided.");
+      setLoading(false);
+      return;
     }
-  }, []);
 
-  // Fetch interview questions
-  useEffect(() => {
-    if (!jobDescription) return;
+    const jobDescription = decodeURIComponent(rawJobDescription);
 
     async function fetchQuestions() {
       try {
+        setLoading(true);
+
         const res = await fetch("/.netlify/functions/generate-questions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -49,7 +38,7 @@ function InterviewContent() {
 
         const data = await res.json();
 
-        if (!data.questions) throw new Error("No questions returned from Claude");
+        if (!data.questions) throw new Error("No questions returned from GPT");
 
         const parsedQuestions = data.questions
           .split("\n")
@@ -62,30 +51,24 @@ function InterviewContent() {
             difficulty: "medium",
           }));
 
-        const jobTitleGuess = jobDescription.split("\n")[0]?.slice(0, 50) || "Job Role";
-
-        const jobInfo = {
-          jobTitle: jobTitleGuess,
-          company: "Your Target Company",
-          requiredSkills: [],
-          responsibilities: [],
-          qualifications: [],
-          companyValues: [],
+        const basicJobData = {
+          jobTitle: "Interview Practice",
+          company: "Your Target Job",
         };
 
         setQuestions(parsedQuestions);
-        setJobData(jobInfo);
+        setJobData(basicJobData);
         setSessionId(`session_${Date.now()}`);
         setLoading(false);
       } catch (err) {
-        console.error("Error fetching questions:", err);
-        setError("Failed to generate questions. Try again.");
+        console.error("Error fetching GPT questions:", err);
+        setError("Failed to generate interview questions. Please try again.");
         setLoading(false);
       }
     }
 
     fetchQuestions();
-  }, [jobDescription]);
+  }, []);
 
   if (loading) {
     return (
@@ -96,10 +79,13 @@ function InterviewContent() {
           </h1>
           <div className="space-y-4">
             <div className="w-full bg-slate-700 rounded-full h-2.5 mb-4">
-              <div className="bg-teal-500 h-2.5 rounded-full animate-pulse" style={{ width: "70%" }} />
+              <div
+                className="bg-teal-500 h-2.5 rounded-full animate-pulse"
+                style={{ width: "70%" }}
+              ></div>
             </div>
             <p className="text-center text-slate-300">
-              Analyzing the job description and generating questions...
+              Analyzing job description and generating relevant interview questions...
             </p>
           </div>
         </div>
@@ -116,7 +102,7 @@ function InterviewContent() {
           <div className="flex justify-center">
             <button
               onClick={() => router.push("/")}
-              className="px-4 py-2 bg-teal-500 text-white rounded-md hover:bg-teal-600"
+              className="px-4 py-2 bg-teal-500 text-white rounded-md hover:bg-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 focus:ring-offset-slate-800"
             >
               Go Back
             </button>
@@ -132,7 +118,7 @@ function InterviewContent() {
         <header className="mb-8">
           <h1 className="text-3xl font-bold text-white">The IG Interview Coach</h1>
           <p className="text-slate-300 mt-2">
-            Position: {jobData?.jobTitle} at {jobData?.company}
+            {jobData?.jobTitle} at {jobData?.company}
           </p>
         </header>
 
@@ -158,7 +144,10 @@ export default function InterviewPage() {
               Loading Interview
             </h1>
             <div className="w-full bg-slate-700 rounded-full h-2.5 mb-4">
-              <div className="bg-teal-500 h-2.5 rounded-full animate-pulse" style={{ width: "70%" }} />
+              <div
+                className="bg-teal-500 h-2.5 rounded-full animate-pulse"
+                style={{ width: "70%" }}
+              ></div>
             </div>
           </div>
         </div>
@@ -168,3 +157,4 @@ export default function InterviewPage() {
     </Suspense>
   );
 }
+
