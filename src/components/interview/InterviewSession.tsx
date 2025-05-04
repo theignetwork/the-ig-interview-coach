@@ -13,17 +13,15 @@ interface InterviewSessionProps {
 export function InterviewSession({ questions: initialQuestions, jobData, sessionId }: InterviewSessionProps) {
   const router = useRouter();
 
-  // ✅ Step 1: Core state setup for tracking interview flow
-  const [questions, setQuestions] = useState<any[]>(initialQuestions); // now mutable
+  const [questions, setQuestions] = useState<any[]>(initialQuestions);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<string[]>([]);
   const [currentAnswer, setCurrentAnswer] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFollowUp, setIsFollowUp] = useState(false);
-  const [isLoadingFollowUp, setIsLoadingFollowUp] = useState(false); // NEW: Claude thinking
+  const [isLoadingFollowUp, setIsLoadingFollowUp] = useState(false);
   const [followUpQuestion, setFollowUpQuestion] = useState<string | null>(null);
 
-  // Optional analysis/mock scoring logic (untouched)
   const [analysisResults, setAnalysisResults] = useState<Record<string, any>>({});
   const [isRecording, setIsRecording] = useState(false);
   const [audioRecorder, setAudioRecorder] = useState<any>(null);
@@ -79,7 +77,6 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
       const updatedAnswers = [...answers, currentAnswer];
       setAnswers(updatedAnswers);
 
-      // ✅ Step 1: Trigger follow-up generation if it's a main question
       const isMainQuestion = currentQuestionIndex % 2 === 0;
 
       if (isMainQuestion) {
@@ -131,7 +128,7 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
   const progressPercentage = ((currentQuestionIndex + (isFollowUp ? 0.5 : 1)) / (questions.length * 1.5)) * 100;
 
   const getFollowUpFromClaude = async (originalQuestion: string, userAnswer: string): Promise<string> => {
-    const response = await fetch("/api/followup", {
+    const response = await fetch("/.netlify/functions/followup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ originalQuestion, userAnswer })
@@ -218,4 +215,5 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
     </div>
   );
 }
+
 
