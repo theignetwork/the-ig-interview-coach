@@ -1,118 +1,176 @@
-// /app/interview/page.tsx
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { InterviewSession } from "@/components/interview/InterviewSession";
 
-interface JobData {
-  jobTitle: string;
-  company: string;
-  requiredSkills: string[];
-  responsibilities: string[];
-  qualifications: string[];
-  companyValues: string[];
+// Client component that safely uses window
+function InterviewContent() {
+  const router = useRouter();
+  const [documentId, setDocumentId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [jobData, setJobData] = useState<any>(null);
+  const [sessionId, setSessionId] = useState<string>("");
+  const [jobDescription, setJobDescription] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const searchParams = new URLSearchParams(window.location.search);
+      const docId = searchParams.get("documentId");
+      const pastedJob = localStorage.getItem("pastedJobDescription");
+
+      if (docId && pastedJob) {
+        setDocumentId(docId);
+        setJobDescription(pastedJob);
+      } else {
+        setError("Missing job description or document ID.");
+        setLoading(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!documentId || !jobDescription) return;
+
+    async function fetchQuestions() {
+      try {
+        if (!loading) setLoading(true);
+
+        const res = await fetch("/.netlify/functions/generate-questions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jobDescription }),
+        });
+
+        const data = await res.json();
+
+        if (!data.question) throw new Error("No question returned from Claude");
+
+        const parsedQuestions = [
+          {
+            id: "q1",
+            text: data.question.trim(),
+            type: "unknown",
+            skill: "unspecified",
+            difficulty: "medium",
+          },
+        ];
+
+        const fakeJobData = {
+          jobTitle: "Custom Role",
+          company: "Company Name",
+          requiredSkills: [],
+          responsibilities: [],
+          qualifications: [],
+          companyValues: [],
+        };
+
+        setQuestions(parsedQuestions);
+        setJobData(fakeJobData);
+        setSessionId(`session_${Date.now()}`);
+        setLoading(false);
+      } catch (error) {
+        console.error("Error fetching questions:", error);
+        setError("Failed to generate interview questions. Please try again.");
+        setLoading(false);
+      }
+    }
+
+    fetchQuestions();
+  }, [documentId, jobDescription]);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-4">
+        <div className="w-full max-w-md p-8 bg-slate-800 rounded-lg shadow-md border border-slate-700">
+          <h1 className="text-2xl font-bold text-center text-white mb-6">
+            Preparing Your Interview
+          </h1>
+          <div className="space-y-4">
+            <div className="w-full bg-slate-700 rounded-full h-2.5 mb-4">
+              <div
+                className="bg-teal-500 h-2.5 rounded-full animate-pulse"
+                style={{ width: "70%" }}
+              ></div>
+            </div>
+            <p className="text-center text-slate-300">
+              Analyzing job description and generating a tailored interview question...
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-4">
+        <div className="w-full max-w-md p-8 bg-slate-800 rounded-lg shadow-md border border-slate-700">
+          <h1 className="text-2xl font-bold text-center text-red-400 mb-6">Error</h1>
+          <p className="text-center text-slate-300 mb-6">{error}</p>
+          <div className="flex justify-center">
+            <button
+              onClick={() => router.push("/")}
+              className="px-4 py-2 bg-teal-500 text-white rounded-md hover:bg-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 focus:ring-offset-slate-800"
+            >
+              Go Back
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen py-8 px-4">
+      <div className="max-w-4xl mx-auto">
+        <header className="mb-8">
+          <h1 className="text-3xl font-bold text-white">The IG Interview Coach</h1>
+          <p className="text-slate-300 mt-2">
+            Position: {jobData?.jobTitle || "Software Engineer"} at{" "}
+            {jobData?.company || "Company"}
+          </p>
+        </header>
+
+        {questions.length > 0 && jobData && (
+          <InterviewSession
+            questions={questions}
+            jobData={jobData}
+            sessionId={sessionId}
+          />
+        )}
+      </div>
+    </div>
+  );
 }
 
+// Main page component with Suspense wrapper
 export default function InterviewPage() {
   return (
-    <Suspense fallback={<p className="text-white text-center mt-20">Loading…</p>}>
+    <Suspense
+      fallback={
+        <div className="flex flex-col items-center justify-center min-h-screen p-4">
+          <div className="w-full max-w-md p-8 bg-slate-800 rounded-lg shadow-md border border-slate-700">
+            <h1 className="text-2xl font-bold text-center text-white mb-6">
+              Loading Interview
+            </h1>
+            <div className="w-full bg-slate-700 rounded-full h-2.5 mb-4">
+              <div
+                className="bg-teal-500 h-2.5 rounded-full animate-pulse"
+                style={{ width: "70%" }}
+              ></div>
+            </div>
+          </div>
+        </div>
+      }
+    >
       <InterviewContent />
     </Suspense>
   );
 }
 
-function InterviewContent() {
-  const params = useSearchParams();
-  const router = useRouter();
-
-  // grab the "job" param and decode it
-  const raw = params.get("job") || "";
-  const jobDescription = decodeURIComponent(raw);
-
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [questions, setQuestions] = useState<string[]>([]);
-  const [jobData, setJobData] = useState<JobData>({
-    jobTitle: "Custom Role",
-    company: "Company Name",
-    requiredSkills: [],
-    responsibilities: [],
-    qualifications: [],
-    companyValues: [],
-  });
-  const [sessionId] = useState(() => `session_${Date.now()}`);
-
-  useEffect(() => {
-    if (jobDescription.length < 10) {
-      setError("Please paste a valid job description.");
-      setLoading(false);
-      return;
-    }
-
-    fetch("/.netlify/functions/generate-questions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jobDescription }),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (!Array.isArray(data.questions) || data.questions.length === 0) {
-          throw new Error("No questions returned");
-        }
-        // populate state
-        setQuestions(data.questions);
-        setJobData({
-          jobTitle: data.jobTitle || "Custom Role",
-          company: data.company || "Company Name",
-          requiredSkills: [],
-          responsibilities: [],
-          qualifications: [],
-          companyValues: [],
-        });
-      })
-      .catch((err) => {
-        console.error(err);
-        setError("Failed to generate interview questions. Please try again.");
-      })
-      .finally(() => setLoading(false));
-  }, [jobDescription]);
-
-  if (loading) {
-    return <p className="text-white text-center mt-20">Loading interview…</p>;
-  }
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center mt-20">
-        <p className="text-red-300 mb-4">{error}</p>
-        <button
-          className="px-4 py-2 bg-teal-500 text-white rounded"
-          onClick={() => router.push("/")}
-        >
-          Back
-        </button>
-      </div>
-    );
-  }
-
-  // map each string into the shape InterviewSession expects
-  const parsed = questions.map((text, i) => ({
-    id: `q${i + 1}`,
-    text: text.trim(),
-    type: "general",
-    skill: "unspecified",
-    difficulty: "medium",
-  }));
-
-  return (
-    <InterviewSession
-      questions={parsed}
-      jobData={jobData}
-      sessionId={sessionId}
-    />
-  );
-}
 
 
 
