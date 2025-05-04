@@ -4,46 +4,34 @@ import { Suspense, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { InterviewSession } from "@/components/interview/InterviewSession";
 
-// Client component that safely uses window
 function InterviewContent() {
   const router = useRouter();
-  const [documentId, setDocumentId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [questions, setQuestions] = useState<any[]>([]);
-  const [jobData, setJobData] = useState<any>(null);
+  const [jobDescription, setJobDescription] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string>("");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const searchParams = new URLSearchParams(window.location.search);
-      const docId = searchParams.get("documentId");
-      setDocumentId(docId);
+      const params = new URLSearchParams(window.location.search);
+      const jd = params.get("jobDescription");
 
-      if (!docId && document.readyState === "complete") {
-        const timer = setTimeout(() => {
-          setError("No document ID provided");
-          setLoading(false);
-        }, 500);
-        return () => clearTimeout(timer);
+      if (!jd) {
+        setError("No job description found.");
+        setLoading(false);
+        return;
       }
+
+      setJobDescription(decodeURIComponent(jd));
     }
   }, []);
 
   useEffect(() => {
-    if (!documentId) return;
+    if (!jobDescription) return;
 
     async function fetchQuestions() {
       try {
-        if (!loading) setLoading(true);
-
-        // TEMP: Hardcoded job description (replace with Supabase in Step 3)
-        const jobDescription = `
-          We're hiring a Senior Front-End Engineer with strong React and TypeScript skills 
-          to lead the development of complex user interfaces. The ideal candidate has experience 
-          mentoring teams, optimizing web performance, and working closely with designers in fast-paced environments.
-        `;
-
         const res = await fetch("/.netlify/functions/generate-questions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -65,17 +53,7 @@ function InterviewContent() {
             difficulty: "medium",
           }));
 
-        const fakeJobData = {
-          jobTitle: "Senior Frontend Developer",
-          company: "Tech Innovations Inc.",
-          requiredSkills: ["React", "TypeScript", "Performance Optimization"],
-          responsibilities: ["Build UI components", "Optimize performance"],
-          qualifications: ["5+ years experience", "Strong JS/TS knowledge"],
-          companyValues: ["Innovation", "Collaboration", "Quality"],
-        };
-
         setQuestions(parsedQuestions);
-        setJobData(fakeJobData);
         setSessionId(`session_${Date.now()}`);
         setLoading(false);
       } catch (error) {
@@ -86,7 +64,7 @@ function InterviewContent() {
     }
 
     fetchQuestions();
-  }, [documentId, loading]);
+  }, [jobDescription]);
 
   if (loading) {
     return (
@@ -136,15 +114,14 @@ function InterviewContent() {
         <header className="mb-8">
           <h1 className="text-3xl font-bold text-white">The IG Interview Coach</h1>
           <p className="text-slate-300 mt-2">
-            Position: {jobData?.jobTitle || "Software Engineer"} at{" "}
-            {jobData?.company || "Tech Company"}
+            Based on the job description you provided
           </p>
         </header>
 
-        {questions.length > 0 && jobData && (
+        {questions.length > 0 && (
           <InterviewSession
             questions={questions}
-            jobData={jobData}
+            jobData={{ jobTitle: "Custom Role", company: "Custom Company" }}
             sessionId={sessionId}
           />
         )}
@@ -153,27 +130,11 @@ function InterviewContent() {
   );
 }
 
-// Main page component with Suspense wrapper
 export default function InterviewPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex flex-col items-center justify-center min-h-screen p-4">
-          <div className="w-full max-w-md p-8 bg-slate-800 rounded-lg shadow-md border border-slate-700">
-            <h1 className="text-2xl font-bold text-center text-white mb-6">
-              Loading Interview
-            </h1>
-            <div className="w-full bg-slate-700 rounded-full h-2.5 mb-4">
-              <div
-                className="bg-teal-500 h-2.5 rounded-full animate-pulse"
-                style={{ width: "70%" }}
-              ></div>
-            </div>
-          </div>
-        </div>
-      }
-    >
+    <Suspense fallback={<div className="text-white p-8">Loading Interview...</div>}>
       <InterviewContent />
     </Suspense>
   );
 }
+
