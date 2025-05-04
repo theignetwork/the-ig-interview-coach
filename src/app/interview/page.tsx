@@ -4,31 +4,39 @@ import { Suspense, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { InterviewSession } from "@/components/interview/InterviewSession";
 
+// Client component that safely uses window
 function InterviewContent() {
   const router = useRouter();
+  const [documentId, setDocumentId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [questions, setQuestions] = useState<any[]>([]);
   const [jobData, setJobData] = useState<any>(null);
   const [sessionId, setSessionId] = useState<string>("");
+  const [jobDescription, setJobDescription] = useState<string | null>(null);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window !== "undefined") {
+      const searchParams = new URLSearchParams(window.location.search);
+      const docId = searchParams.get("documentId");
+      const pastedJob = localStorage.getItem("pastedJobDescription");
 
-    const searchParams = new URLSearchParams(window.location.search);
-    const rawJobDescription = searchParams.get("job");
-
-    if (!rawJobDescription) {
-      setError("No job description provided.");
-      setLoading(false);
-      return;
+      if (docId && pastedJob) {
+        setDocumentId(docId);
+        setJobDescription(pastedJob);
+      } else {
+        setError("Missing job description or document ID.");
+        setLoading(false);
+      }
     }
+  }, []);
 
-    const jobDescription = decodeURIComponent(rawJobDescription);
+  useEffect(() => {
+    if (!documentId || !jobDescription) return;
 
     async function fetchQuestions() {
       try {
-        setLoading(true);
+        if (!loading) setLoading(true);
 
         const res = await fetch("/.netlify/functions/generate-questions", {
           method: "POST",
@@ -38,7 +46,7 @@ function InterviewContent() {
 
         const data = await res.json();
 
-        if (!data.questions) throw new Error("No questions returned from GPT");
+        if (!data.questions) throw new Error("No questions returned from Claude");
 
         const parsedQuestions = data.questions
           .split("\n")
@@ -51,24 +59,28 @@ function InterviewContent() {
             difficulty: "medium",
           }));
 
-        const basicJobData = {
-          jobTitle: "Interview Practice",
-          company: "Your Target Job",
+        const fakeJobData = {
+          jobTitle: "Custom Role",
+          company: "Company Name",
+          requiredSkills: [],
+          responsibilities: [],
+          qualifications: [],
+          companyValues: [],
         };
 
         setQuestions(parsedQuestions);
-        setJobData(basicJobData);
+        setJobData(fakeJobData);
         setSessionId(`session_${Date.now()}`);
         setLoading(false);
-      } catch (err) {
-        console.error("Error fetching GPT questions:", err);
+      } catch (error) {
+        console.error("Error fetching questions:", error);
         setError("Failed to generate interview questions. Please try again.");
         setLoading(false);
       }
     }
 
     fetchQuestions();
-  }, []);
+  }, [documentId, jobDescription]);
 
   if (loading) {
     return (
@@ -118,7 +130,7 @@ function InterviewContent() {
         <header className="mb-8">
           <h1 className="text-3xl font-bold text-white">The IG Interview Coach</h1>
           <p className="text-slate-300 mt-2">
-            {jobData?.jobTitle} at {jobData?.company}
+            Position: {jobData?.jobTitle || "Software Engineer"} at {jobData?.company || "Company"}
           </p>
         </header>
 
@@ -134,6 +146,7 @@ function InterviewContent() {
   );
 }
 
+// Main page component with Suspense wrapper
 export default function InterviewPage() {
   return (
     <Suspense
@@ -157,4 +170,3 @@ export default function InterviewPage() {
     </Suspense>
   );
 }
-
