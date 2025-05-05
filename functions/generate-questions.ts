@@ -6,9 +6,12 @@ const anthropic = new Anthropic({
 
 export const handler = async (event: any) => {
   try {
+    console.log("📥 Event received:", event.body);
+
     const { jobDescription } = JSON.parse(event.body || "{}");
 
     if (!jobDescription || jobDescription.trim().length < 10) {
+      console.log("❌ Missing or invalid job description");
       return {
         statusCode: 400,
         body: JSON.stringify({ error: "Missing or invalid job description" }),
@@ -27,18 +30,22 @@ ${jobDescription}
 Questions:
 1.`;
 
+    console.log("🧠 Sending prompt to Claude...");
+
     const completion = await anthropic.messages.create({
-      model: "claude-3-opus-20240229", // Or use haiku if you prefer
+      model: "claude-3-opus-20240229",
       max_tokens: 600,
       temperature: 0.7,
       messages: [{ role: "user", content: prompt }],
     });
 
-    const text = completion.content?.[0]?.text?.trim();
+    console.log("✅ Claude response received:", completion);
 
-    console.log("Claude raw output:\n", text); // ✅ ADD THIS LINE HERE
+    const text = completion.content?.[0]?.text?.trim();
+    console.log("📝 Raw Claude output:", text);
 
     if (!text) {
+      console.log("⚠️ Claude returned no usable output");
       return {
         statusCode: 500,
         body: JSON.stringify({ error: "Claude returned no output." }),
@@ -48,6 +55,7 @@ Questions:
     const lines = text.match(/\d+\.\s(.+)/g);
 
     if (!lines || lines.length < 6) {
+      console.log("⚠️ Parsing failed or not enough lines returned:", lines);
       return {
         statusCode: 500,
         body: JSON.stringify({ error: "Claude did not return enough questions." }),
@@ -62,18 +70,21 @@ Questions:
       difficulty: "medium",
     }));
 
+    console.log("✅ Parsed questions:", questions);
+
     return {
       statusCode: 200,
       body: JSON.stringify({ questions }),
     };
   } catch (err: any) {
-    console.error("Claude error:", err?.message || err);
+    console.error("🔥 Claude handler error:", err?.message || err);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: "Internal Server Error" }),
     };
   }
 };
+
 
 
 
