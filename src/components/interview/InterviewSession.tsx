@@ -150,8 +150,16 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
 
   // Submit answer for main questions
   const handleSubmitAnswer = async () => {
-    if (!currentAnswer.trim() || isSubmitting) return;
+    // Ensure there's a meaningful answer (not just whitespace or very short)
+    if (!currentAnswer.trim() || currentAnswer.trim().length < 3 || isSubmitting) {
+      if (currentAnswer.trim().length < 3 && currentAnswer.trim().length > 0) {
+        setRecordingError("Please provide a more detailed answer before submitting.");
+      }
+      return;
+    }
+    
     setIsSubmitting(true);
+    setRecordingError(null); // Clear any previous errors
 
     try {
       const updatedAnswers = [...answers, currentAnswer];
@@ -171,7 +179,7 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
         } catch (followUpError) {
           console.error("Error getting follow-up:", followUpError);
           // Fallback follow-up that maintains the interview simulation
-          setFollowUpQuestion("That's interesting. Could you elaborate a bit more on that specific aspect?");
+          setFollowUpQuestion("Can you elaborate more on your approach to that situation? Perhaps share a specific example.");
           setIsFollowUp(true);
           setCurrentAnswer("");
         } finally {
@@ -249,7 +257,7 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
 
   // Get follow-up question from Claude
   const getFollowUpFromClaude = async (originalQuestion: string, userAnswer: string): Promise<string> => {
-    if (!originalQuestion.trim() || !userAnswer.trim()) {
+    if (!originalQuestion.trim() || !userAnswer.trim() || userAnswer.trim().length < 3) {
       return "I'd like to understand more about your approach. Could you give me a specific example from your experience?";
     }
     
