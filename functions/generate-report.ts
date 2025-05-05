@@ -5,7 +5,7 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
 });
 
-// Make sure to export the handler properly
+// Export the handler properly
 export const handler: Handler = async (event) => {
   try {
     console.log("Function started, processing request...");
@@ -25,31 +25,43 @@ export const handler: Handler = async (event) => {
       `Q: ${qa.question.substring(0, 150)}\nA: ${(qa.answer || "No answer").substring(0, 200)}`
     ).join("\n\n");
     
-    // Create a shorter prompt
+    // Create the improved prompt
     const prompt = `
-As an interview coach, analyze this mock interview and provide JSON feedback:
+As an expert interview coach, analyze this mock interview and provide detailed, actionable feedback.
 
-${jobDescription ? "Job: " + jobDescription.substring(0, 200) + "..." : ""}
+Job Description:
+${jobDescription ? jobDescription.substring(0, 500) + (jobDescription.length > 500 ? "..." : "") : "A professional role requiring communication, problem-solving, and technical skills."}
 
-Interview:
+Interview Transcript:
 ${interviewSummary}
 
-Return only this JSON object:
+Provide a personalized analysis that will help the candidate improve. Be specific, varied, and actionable in your feedback.
+
+When writing feedback:
+1. Vary your improvement suggestions beyond just "provide more specific examples"
+2. Include specific action items for each area of improvement
+3. Explain briefly why each improvement matters for this specific job role
+4. Suggest 1-2 specific follow-up practice questions for areas that need improvement
+5. End with a brief personalized note of encouragement
+
+Return your analysis in this JSON format:
 {
-  "overallScore": (0-100),
-  "overallFeedback": "1-2 sentence assessment",
-  "keyStrengths": ["Strength 1", "Strength 2", "Strength 3"],
-  "areasForImprovement": ["Area 1", "Area 2", "Area 3"],
-  "dangerZones": ["Flag 1", "Flag 2"],
-  "dangerZoneRisk": "Low/Medium/High",
+  "overallScore": 75, // Score from 0-100
+  "overallFeedback": "1-2 sentence personalized assessment that addresses strengths and weaknesses",
+  "keyStrengths": ["Specific strength 1", "Specific strength 2", "Specific strength 3"],
+  "areasForImprovement": ["Specific improvement area 1", "Specific improvement area 2", "Specific improvement area 3"],
+  "dangerZones": ["Specific red flag 1", "Specific red flag 2"], // Include only if applicable
+  "dangerZoneRisk": "Low/Medium/High", // Include only if dangerZones exist
   "questionFeedback": [
     {
-      "question": "Question text",
-      "score": (0-100),
-      "strengths": ["Strength 1"],
-      "improvements": ["Improvement 1"]
+      "question": "The question text",
+      "score": 75, // Score from 0-100
+      "strengths": ["Specific strength 1", "Specific strength 2"],
+      "improvements": ["Specific actionable improvement 1", "Specific actionable improvement 2"]
     }
-  ]
+  ],
+  "practiceQuestions": ["Follow-up question 1", "Follow-up question 2"],
+  "encouragementNote": "A brief personalized note of encouragement"
 }`;
     
     console.log("Sending request to Anthropic API...");
@@ -110,7 +122,12 @@ Return only this JSON object:
           strengths: ["You provided a complete answer"],
           improvements: ["Add more specificity to your examples"]
         }
-      ]
+      ],
+      practiceQuestions: [
+        "Can you describe a specific situation where you demonstrated leadership skills?",
+        "How do you prioritize tasks when facing multiple deadlines?"
+      ],
+      encouragementNote: "Keep practicing! With some refinement of your interview technique, you'll be well-prepared for your next opportunity."
     };
     
     return {
