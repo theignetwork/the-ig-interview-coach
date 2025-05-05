@@ -10,10 +10,38 @@ interface InterviewSessionProps {
   sessionId: string;
 }
 
-export function InterviewSession({ questions: initialQuestions, jobData, sessionId }: InterviewSessionProps) {
+export function InterviewSession({ questions: initialQuestions, jobData: initialJobData, sessionId }: InterviewSessionProps) {
   const router = useRouter();
 
+  // Function to extract job info from job description
+  const extractJobInfo = (jobDescription: string | null) => {
+    if (!jobDescription) {
+      return { title: "Custom Role", company: "Company Name" };
+    }
+    
+    // Try to extract job title
+    let title = "Custom Role";
+    let company = "Company Name";
+    
+    // Common patterns in job descriptions
+    const titleRegex = /(?:job title|position|role|for a)\s*:?\s*([\w\s]+(?:developer|engineer|designer|manager|specialist|consultant|analyst|assistant|coordinator|director|lead|architect|officer|administrator|supervisor))/i;
+    const companyRegex = /(?:at|for|with|by|company|organization)\s*:?\s*([A-Z][A-Za-z0-9\s&]+(?:Inc|LLC|Ltd|Corp|Company|Group|Technologies|Solutions|Associates)?)/;
+    
+    const titleMatch = jobDescription.match(titleRegex);
+    if (titleMatch && titleMatch[1]) {
+      title = titleMatch[1].trim();
+    }
+    
+    const companyMatch = jobDescription.match(companyRegex);
+    if (companyMatch && companyMatch[1]) {
+      company = companyMatch[1].trim();
+    }
+    
+    return { title, company };
+  };
+
   // State variables
+  const [jobData, setJobData] = useState(initialJobData);
   const [questions, setQuestions] = useState<any[]>(initialQuestions.slice(0, 3)); // Only use the first 3 questions initially
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<string[]>([]);
@@ -31,13 +59,25 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
 
   const currentQuestion = isFollowUp ? { text: followUpQuestion ?? "" } : questions[currentQuestionIndex];
 
-  // Load audio recorder
+  // Load audio recorder and enhance job data
   useEffect(() => {
+    // Load audio recorder
     import("@/lib/whisper").then(({ AudioRecorder }) => {
       if (AudioRecorder.isSupported()) {
         setAudioRecorder(new AudioRecorder());
       }
     });
+    
+    // Try to extract job info from the stored job description
+    const jobDescription = localStorage.getItem("pastedJobDescription");
+    if (jobDescription) {
+      const jobInfo = extractJobInfo(jobDescription);
+      setJobData(prevData => ({
+        ...prevData,
+        jobTitle: jobInfo.title,
+        company: jobInfo.company
+      }));
+    }
   }, []);
 
   // Handle text input
@@ -423,10 +463,11 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
         />
       </div>
 
+      {/* Updated progress indicator to show percentage instead of fraction */}
       <div className="mt-2 text-right text-sm text-slate-400">
         {interviewStage === "main" 
-          ? `${isFollowUp ? "Follow-up" : "Question"} ${currentQuestionIndex + 1}/3`
-          : `Final Questions ${currentQuestionIndex + 1}/2`
+          ? `${isFollowUp ? "Follow-up Question" : "Progress"}: ${Math.floor(progressPercentage)}%`
+          : `Final Questions: ${Math.floor(progressPercentage)}%`
         }
       </div>
 
