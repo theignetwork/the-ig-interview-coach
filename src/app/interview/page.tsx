@@ -46,7 +46,7 @@ function InterviewContent() {
 
         const data = await res.json();
 
-        if (!data.questions || data.questions.length < 6) {
+        if (!data.questions || data.questions.length < 3) {
           throw new Error("Not enough questions returned from Claude.");
         }
 
