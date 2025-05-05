@@ -10288,47 +10288,72 @@ Anthropic.Models = Models2;
 Anthropic.ModelInfosPage = ModelInfosPage;
 Anthropic.Beta = Beta;
 var { HUMAN_PROMPT, AI_PROMPT } = Anthropic;
-var sdk_default = Anthropic;
 
 // functions/generate-questions.ts
-var anthropic = new sdk_default({
+var anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
 });
 var handler = async (event) => {
   try {
+    console.log("\u{1F4E5} Event received:", event.body);
     const { jobDescription } = JSON.parse(event.body || "{}");
-    if (!jobDescription) {
+    if (!jobDescription || jobDescription.trim().length < 10) {
+      console.log("\u274C Missing or invalid job description");
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: "Missing job description" })
+        body: JSON.stringify({ error: "Missing or invalid job description" })
       };
     }
-    const prompt = `
-You are a friendly, expert job interviewer. Based on the job description below, write one strong, customized interview question to assess the candidate\u2019s fit for the role. It should be role-specific and help uncover skills, behavior, or motivation.
+    const prompt = `You're a job interview expert.
+
+Based on the job description below, generate a tailored list of 6 behavioral interview questions that assess problem-solving, communication, leadership, adaptability, and job-specific skills.
+
+Only return the 6 questions as a numbered list \u2014 no intro or explanation.
 
 Job Description:
 ${jobDescription}
 
-Respond ONLY with the interview question and nothing else.
-`;
-    const response = await anthropic.messages.create({
+Questions:
+1.`;
+    console.log("\u{1F9E0} Sending prompt to Claude...");
+    const completion = await anthropic.messages.create({
       model: "claude-3-opus-20240229",
-      max_tokens: 200,
-      temperature: 0.6,
-      messages: [
-        {
-          role: "user",
-          content: prompt.trim()
-        }
-      ]
+      max_tokens: 600,
+      temperature: 0.7,
+      messages: [{ role: "user", content: prompt }]
     });
-    const question = response.content[0].text.trim();
+    console.log("\u2705 Claude response received:", completion);
+    const text = completion.content?.[0]?.text?.trim();
+    console.log("\u{1F4DD} Raw Claude output:", text);
+    if (!text) {
+      console.log("\u26A0\uFE0F Claude returned no usable output");
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: "Claude returned no output." })
+      };
+    }
+    const lines = text.match(/\d+\.\s(.+)/g);
+    if (!lines || lines.length < 6) {
+      console.log("\u26A0\uFE0F Parsing failed or not enough lines returned:", lines);
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: "Claude did not return enough questions." })
+      };
+    }
+    const questions = lines.map((line, i2) => ({
+      id: `q${i2 + 1}`,
+      text: line.replace(/^\d+\.\s*/, "").trim(),
+      type: "behavioral",
+      skill: "unspecified",
+      difficulty: "medium"
+    }));
+    console.log("\u2705 Parsed questions:", questions);
     return {
       statusCode: 200,
-      body: JSON.stringify({ question })
+      body: JSON.stringify({ questions })
     };
-  } catch (error) {
-    console.error("Claude error:", error.message);
+  } catch (err) {
+    console.error("\u{1F525} Claude handler error:", err?.message || err);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: "Internal Server Error" })
