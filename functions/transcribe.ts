@@ -5,6 +5,10 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 
+export const config = {
+  bodyParser: false,
+};
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
@@ -18,10 +22,7 @@ const handler: Handler = async (event) => {
   }
 
   return new Promise((resolve, reject) => {
-    const busboy = new Busboy({
-      headers: event.headers,
-    });
-
+    const busboy = new Busboy({ headers: event.headers });
     let uploadPath = "";
     let fileWriteStream: fs.WriteStream;
 
@@ -53,9 +54,11 @@ const handler: Handler = async (event) => {
       }
     });
 
+    // IMPORTANT: Netlify sends body as base64 by default
     busboy.end(Buffer.from(event.body || "", "base64"));
   });
 };
 
 export { handler };
+
 
