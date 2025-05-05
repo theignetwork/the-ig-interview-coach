@@ -36,6 +36,8 @@ Questions:
 
     const text = completion.content?.[0]?.text?.trim();
 
+    console.log("Claude raw output:\n", text); // ✅ ADD THIS LINE HERE
+
     if (!text) {
       return {
         statusCode: 500,
