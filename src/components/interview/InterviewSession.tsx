@@ -67,7 +67,7 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
         });
 
         const data = await response.json();
-        const transcription = data.transcript || "[No transcription available]";
+        const transcription = data.text || "[No transcription available]";
 
         setCurrentAnswer(currentAnswer.replace("Transcribing audio...", transcription));
       }
@@ -228,6 +228,7 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
     </div>
   );
 }
+
 
 
 
