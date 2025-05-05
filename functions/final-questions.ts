@@ -17,10 +17,24 @@ interface ErrorResponse {
 const handler: Handler = async (event, context) => {
   try {
     const prompt = `
-You're a job interview expert.
-Please generate two final interview questions:
-1. A classic interview question like "What's your greatest weakness?" or "Why do you want to work here?"
-2. A curveball question that reveals personality, creativity, or values, but is still appropriate for a professional setting.
+You're a job interview expert generating the final two questions for an interview.
+
+1. For the first question, generate a classic, professional interview question that helps assess the candidate's fit, like "What's your greatest strength?" or "Where do you see yourself in five years?"
+
+2. For the second question, generate a thought-provoking curveball question that reveals deeper thinking and values. 
+   
+IMPORTANT FOR THE CURVEBALL QUESTION:
+- Avoid clichéd questions like "what superpower would you have" or "what animal would you be"
+- Instead, create a question that reveals critical thinking, problem-solving approach, values, or perspective
+- The question should feel innovative but still professionally appropriate
+- It should prompt reflection and reveal how the candidate thinks rather than just what they know
+- The question should be intellectually stimulating and somewhat challenging
+- Examples of good curveball questions:
+  * "What's a commonly held belief in your field that you think might be wrong?"
+  * "If you could redesign any aspect of how organizations in our industry operate, what would you change?"
+  * "What's a difficult truth about this industry that people don't like to admit?"
+  * "How would you explain what you do to a bright 10-year-old?"
+
 Only return the two questions as plain text, numbered like this:
 1. [classic question]
 2. [curveball question]
@@ -28,7 +42,7 @@ Only return the two questions as plain text, numbered like this:
     const completion = await anthropic.messages.create({
       model: "claude-3-opus-20240229",
       max_tokens: 300,
-      temperature: 0.7,
+      temperature: 0.8,
       messages: [{ role: "user", content: prompt }]
     });
     
@@ -41,12 +55,12 @@ Only return the two questions as plain text, numbered like this:
     if (!matches || matches.length < 3) {
       console.log("Failed to parse questions from Claude response:", text);
       
-      // Provide fallback questions
+      // Provide better fallback questions
       return {
         statusCode: 200,
         body: JSON.stringify({
           classic: "What would you say are your greatest strengths, and how do they align with this role?",
-          curveball: "If you could solve one big problem in your industry, what would it be and why?"
+          curveball: "What's a commonly held belief in your professional field that you think might be wrong, and why?"
         } as FinalQuestionsResponse)
       };
     }
