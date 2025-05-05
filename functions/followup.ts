@@ -11,33 +11,41 @@ const handler: Handler = async (event) => {
     const { originalQuestion, userAnswer } = body;
     
     // Better handling of missing inputs
-    if (!originalQuestion || !userAnswer) {
-      console.log("Missing inputs:", { originalQuestion: !!originalQuestion, userAnswer: !!userAnswer });
-      // Return a contextually appropriate follow-up instead of an error
+    if (!originalQuestion || !userAnswer || userAnswer.trim().length < 3) {
+      console.log("Insufficient input for follow-up:", { 
+        originalQuestion: originalQuestion?.substring(0, 30), 
+        userAnswer: userAnswer?.substring(0, 30) 
+      });
+      
+      // Return an interview-appropriate follow-up instead of breaking character
       return {
         statusCode: 200,
         body: JSON.stringify({ 
-          followUpQuestion: "That's interesting. Could you expand on that with a specific example from your experience?" 
+          followUpQuestion: "Could you provide a specific example from your past experience that relates to this situation?" 
         })
       };
     }
     
-    // Improved prompt to ensure we get an interviewer-style follow-up
+    // Improved prompt to ensure we stay in character
     const prompt = `
-You're an expert interview coach creating follow-up questions for a job interview simulation.
-A candidate was just asked a job interview question. Based on their answer, generate a single thoughtful follow-up question that digs deeper.
-Make it feel natural, as if it came from a real interviewer conducting the interview, not like you're giving advice to the candidate.
-IMPORTANT: Only return the follow-up question text directly - no introduction, no explanation, and no other commentary.
----
-Original Question:
-${originalQuestion}
-Candidate's Answer:
-${userAnswer}
+You are an interviewer conducting a job interview. You should ALWAYS stay in character as the interviewer.
+You were just asking the candidate this question: "${originalQuestion}"
+
+The candidate answered: "${userAnswer}"
+
+Based on their answer, generate ONE follow-up question that digs deeper. The question should:
+- Feel natural coming from an interviewer
+- Be directly related to something mentioned in their answer
+- Ask for more specific details, examples, or reflection
+- Be just ONE sentence if possible
+
+IMPORTANT: Return ONLY the follow-up question text. Do not include ANY explanations, commentary, or phrases like "Follow-up:" or "Interviewer:". 
+Do NOT mention that you are Claude or an AI. Strictly stay in character as a human interviewer.
 `;
     
     const response = await anthropic.messages.create({
       model: "claude-3-opus-20240229",
-      max_tokens: 200,
+      max_tokens: 150,
       temperature: 0.7,
       messages: [{ role: "user", content: prompt }]
     });
@@ -45,8 +53,9 @@ ${userAnswer}
     let followUpQuestion = response.content[0].text.trim();
     
     // Clean up response to ensure it's just a question
-    // Remove any prefixes like "Follow-up:" or "Interviewer:"
-    followUpQuestion = followUpQuestion.replace(/^(Follow-up|Interviewer|Question):?\s*/i, '');
+    followUpQuestion = followUpQuestion
+      .replace(/^(Follow-up|Interviewer|Question):?\s*/i, '')
+      .replace(/^["']|["']$/g, ''); // Remove quotes if Claude added them
     
     console.log("Follow-up question:", followUpQuestion);
     
@@ -61,7 +70,7 @@ ${userAnswer}
     return {
       statusCode: 200,
       body: JSON.stringify({ 
-        followUpQuestion: "That's an interesting perspective. Could you tell me about a time when you applied this approach in a real situation?" 
+        followUpQuestion: "Can you share a specific example of how you handled a similar situation in your previous role?" 
       })
     };
   }
