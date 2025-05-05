@@ -25,6 +25,7 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
   const [isRecording, setIsRecording] = useState(false);
   const [audioRecorder, setAudioRecorder] = useState<any>(null);
   const [recordingError, setRecordingError] = useState<string | null>(null);
+  const [recordingFormat, setRecordingFormat] = useState<string>("audio/webm");
 
   const currentQuestion = isFollowUp ? { text: followUpQuestion ?? "" } : questions[currentQuestionIndex];
 
@@ -56,20 +57,54 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
         const audioBlob = await audioRecorder.stopRecording();
         setIsRecording(false);
 
+        // Log audio information for debugging
+        console.log("Recorded audio MIME type:", audioBlob.type);
+        console.log("Recorded audio size:", audioBlob.size, "bytes");
+        
+        // Update the recording format state
+        setRecordingFormat(audioBlob.type || "audio/webm");
+
         setCurrentAnswer(currentAnswer + (currentAnswer ? "\n\n" : "") + "Transcribing audio...");
 
-        const formData = new FormData();
-        formData.append("file", audioBlob, "recording.webm");
-
-        const response = await fetch("/.netlify/functions/transcribe", {
-          method: "POST",
-          body: formData,
+        // Create a proper File object instead of using the Blob directly
+        const fileName = `recording-${Date.now()}.webm`;
+        const audioFile = new File([audioBlob], fileName, { 
+          type: audioBlob.type || "audio/webm" 
         });
 
-        const data = await response.json();
-        const transcription = data.text || "[No transcription available]";
+        const formData = new FormData();
+        formData.append("file", audioFile);
 
-        setCurrentAnswer(currentAnswer.replace("Transcribing audio...", transcription));
+        try {
+          const response = await fetch("/.netlify/functions/transcribe", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error("Server error:", errorText);
+            throw new Error(`Server returned ${response.status}: ${errorText}`);
+          }
+
+          const data = await response.json();
+          
+          if (!data.text) {
+            throw new Error("No transcription returned from server");
+          }
+          
+          const transcription = data.text;
+          
+          // Replace the placeholder with the actual transcription
+          setCurrentAnswer(currentAnswer => currentAnswer.replace("Transcribing audio...", transcription));
+        } catch (transcriptionError) {
+          console.error("Transcription error:", transcriptionError);
+          // Replace the placeholder with an error message
+          setCurrentAnswer(currentAnswer => 
+            currentAnswer.replace("Transcribing audio...", "[Transcription failed. Please try again or type your response.]")
+          );
+          setRecordingError(`Transcription failed: ${transcriptionError.message || "Unknown error"}`);
+        }
       }
     } catch (error) {
       console.error("Error with recording:", error);
@@ -191,6 +226,12 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
 
       {recordingError && (
         <p className="text-red-400 mb-4">{recordingError}</p>
+      )}
+
+      {recordingFormat && recordingFormat !== "audio/webm" && (
+        <p className="text-yellow-400 mb-4">
+          Your browser is recording in {recordingFormat} format. If you experience issues, try typing your response instead.
+        </p>
       )}
 
       <div className="flex items-center justify-between mb-4">
