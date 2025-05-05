@@ -249,6 +249,60 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
 
   // Complete the interview
   const handleInterviewComplete = () => {
+    // Save interview data to localStorage before navigating
+    try {
+      // Combine main questions and their follow-ups with final questions
+      const allQuestionsAndAnswers = [];
+      
+      // First, collect the main questions and their follow-ups
+      const mainQuestions = initialQuestions.slice(0, 3);
+      for (let i = 0; i < mainQuestions.length; i++) {
+        // Main question
+        allQuestionsAndAnswers.push({
+          question: mainQuestions[i].text,
+          answer: answers[i*2] || ""
+        });
+        
+        // Follow-up (if available in answers)
+        if (answers[i*2 + 1]) {
+          allQuestionsAndAnswers.push({
+            question: `Follow-up: Related to the previous question`,
+            answer: answers[i*2 + 1] || ""
+          });
+        }
+      }
+      
+      // Add final questions
+      if (answers.length > 6) {
+        // Classic question
+        allQuestionsAndAnswers.push({
+          question: questions[0].text, // Classic question in final stage
+          answer: answers[6] || ""
+        });
+      }
+      
+      if (answers.length > 7) {
+        // Curveball question
+        allQuestionsAndAnswers.push({
+          question: questions[1].text, // Curveball question in final stage
+          answer: answers[7] || ""
+        });
+      }
+      
+      const interviewData = {
+        jobDescription: localStorage.getItem("pastedJobDescription"),
+        sessionId: sessionId,
+        timestamp: Date.now(),
+        questionsAndAnswers: allQuestionsAndAnswers
+      };
+      
+      localStorage.setItem(`interview_${sessionId}`, JSON.stringify(interviewData));
+      console.log("Saved interview data to localStorage:", interviewData);
+    } catch (error) {
+      console.error("Error saving interview data:", error);
+    }
+    
+    // Navigate to feedback page
     router.push(`/feedback?sessionId=${sessionId}`);
   };
 
