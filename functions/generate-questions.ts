@@ -15,37 +15,54 @@ export const handler = async (event: any) => {
       };
     }
 
-   const prompt = `You are an AI interview assistant. Given a job description, return only ONE clear, concise, thoughtful interview question that evaluates a candidate's real-world fit. Do not introduce the question. Do not include chit-chat or extra commentary. Return only the question itself.
+    const prompt = `You're a job interview expert.
+
+Based on the job description below, generate a tailored list of 6 behavioral interview questions that assess problem-solving, communication, leadership, adaptability, and job-specific skills.
+
+Only return the 6 questions as a numbered list — no intro or explanation.
 
 Job Description:
 ${jobDescription}
 
-Question:`;
+Questions:
+1.`;
 
     const completion = await anthropic.messages.create({
-      model: "claude-3-haiku-20240307",
-      max_tokens: 300,
+      model: "claude-3-opus-20240229", // Or use haiku if you prefer
+      max_tokens: 600,
       temperature: 0.7,
-      messages: [
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
+      messages: [{ role: "user", content: prompt }],
     });
 
-    const output = completion.content?.[0]?.text?.trim();
+    const text = completion.content?.[0]?.text?.trim();
 
-    if (!output) {
+    if (!text) {
       return {
         statusCode: 500,
         body: JSON.stringify({ error: "Claude returned no output." }),
       };
     }
 
+    const lines = text.match(/\d+\.\s(.+)/g);
+
+    if (!lines || lines.length < 6) {
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: "Claude did not return enough questions." }),
+      };
+    }
+
+    const questions = lines.map((line, i) => ({
+      id: `q${i + 1}`,
+      text: line.replace(/^\d+\.\s*/, '').trim(),
+      type: "behavioral",
+      skill: "unspecified",
+      difficulty: "medium",
+    }));
+
     return {
       statusCode: 200,
-      body: JSON.stringify({ question: output }),
+      body: JSON.stringify({ questions }),
     };
   } catch (err: any) {
     console.error("Claude error:", err?.message || err);
@@ -55,6 +72,7 @@ Question:`;
     };
   }
 };
+
 
 
 
