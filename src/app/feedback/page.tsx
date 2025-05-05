@@ -132,54 +132,88 @@ export default function FeedbackPage() {
         <h1 className="text-3xl font-bold text-center mb-8">Your Interview Feedback</h1>
         <p className="text-center text-slate-400 mb-4">Session ID: {sessionId}</p>
         
-        {/* Overall Score - Enhanced with gradient and animation */}
+        {/* Enhanced premium score circle component */}
         <div className="bg-slate-800 p-8 rounded-lg shadow-md border border-slate-700 mb-8">
-          <div className="flex items-center mb-6">
-            <div className="relative w-32 h-32 mr-6">
-              {/* Background circle */}
-              <div className="w-full h-full rounded-full bg-slate-700"></div>
+          <div className="flex flex-col md:flex-row items-center">
+            <div className="relative w-40 h-40 md:mr-8 mb-6 md:mb-0">
+              {/* Outer glow effect */}
+              <div className="absolute inset-0 rounded-full bg-teal-400/10 blur-xl"></div>
+              
+              {/* Background gradient circle */}
+              <div className="absolute inset-1 rounded-full bg-gradient-to-br from-slate-800 to-slate-900 shadow-inner"></div>
               
               {/* Score display with animation */}
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-5xl font-bold">
-                  {/* Dynamic color based on score */}
+                <div className="text-center">
                   <span className={`
+                    text-6xl font-bold drop-shadow-[0_0_10px_rgba(45,212,191,0.5)]
                     ${report.overallScore >= 80 ? 'text-teal-400' : 
                       report.overallScore >= 70 ? 'text-teal-300' : 
                       report.overallScore >= 60 ? 'text-yellow-400' : 'text-red-400'}
                   `}>{report.overallScore}</span>
-                </span>
+                </div>
               </div>
               
-              {/* Progress circle with gradient */}
+              {/* Progress circle with gradient and animation */}
               <svg className="absolute inset-0" width="100%" height="100%" viewBox="0 0 100 100">
                 <defs>
                   <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                     <stop offset="0%" stopColor="#0d9488" />
                     <stop offset="100%" stopColor="#2dd4bf" />
                   </linearGradient>
+                  {/* Add blur filter for glow effect */}
+                  <filter id="glow">
+                    <feGaussianBlur stdDeviation="2.5" result="blur" />
+                    <feMerge>
+                      <feMergeNode in="blur" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
                 </defs>
+                
+                {/* Dark track circle */}
                 <circle 
-                  cx="50" cy="50" r="45" 
+                  cx="50" cy="50" r="42" 
                   fill="none" 
                   stroke="#1e293b" 
                   strokeWidth="8"
                 />
+                
+                {/* Secondary indicator track */}
                 <circle 
-                  cx="50" cy="50" r="45" 
+                  cx="50" cy="50" r="42" 
+                  fill="none" 
+                  stroke="#0f172a" 
+                  strokeWidth="2"
+                  strokeDasharray="4,2"
+                />
+                
+                {/* Score progress circle with glow */}
+                <circle 
+                  cx="50" cy="50" r="42" 
                   fill="none" 
                   stroke="url(#scoreGradient)" 
                   strokeWidth="8"
-                  strokeDasharray={`${2 * Math.PI * 45 * report.overallScore / 100} ${2 * Math.PI * 45 * (1 - report.overallScore / 100)}`}
+                  strokeDasharray={`${2 * Math.PI * 42 * report.overallScore / 100} ${2 * Math.PI * 42 * (1 - report.overallScore / 100)}`}
                   strokeDashoffset="0"
                   strokeLinecap="round"
                   transform="rotate(-90 50 50)"
+                  filter="url(#glow)"
                 />
+                
+                {/* Decorative dots at 25%, 50%, 75% intervals */}
+                <circle cx="50" cy="8" r="2" fill="#64748b" />
+                <circle cx="92" cy="50" r="2" fill="#64748b" />
+                <circle cx="50" cy="92" r="2" fill="#64748b" />
+                <circle cx="8" cy="50" r="2" fill="#64748b" />
               </svg>
             </div>
-            <div>
-              <h2 className="text-xl font-bold mb-2">Overall Score</h2>
-              <p className="text-slate-300">{report.overallFeedback}</p>
+            
+            <div className="flex-1">
+              <h2 className="text-2xl font-bold mb-3 text-white">Overall Score</h2>
+              <div className="bg-slate-900/50 p-4 rounded border-l-4 border-teal-500">
+                <p className="text-slate-300 leading-relaxed">{report.overallFeedback}</p>
+              </div>
             </div>
           </div>
         </div>
