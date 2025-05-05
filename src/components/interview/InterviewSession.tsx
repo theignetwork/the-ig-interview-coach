@@ -137,6 +137,21 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
     return data.followUpQuestion;
   };
 
+  // ✅ PASTE THIS HERE:
+const getFinalQuestionsFromClaude = async (): Promise<{ classic: string; curveball: string }> => {
+  const res = await fetch("/.netlify/functions/final-questions");
+  const data = await res.json();
+
+  if (!data.classic || !data.curveball) {
+    throw new Error("Failed to load final questions from Claude");
+  }
+
+  return {
+    classic: data.classic,
+    curveball: data.curveball
+  };
+};
+
   return (
     <div className="max-w-3xl mx-auto p-6 bg-slate-800 rounded-lg shadow-md border border-slate-700">
       <div className="mb-6">
