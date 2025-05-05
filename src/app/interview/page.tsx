@@ -1,167 +1,385 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { InterviewSession } from "@/components/interview/InterviewSession";
+import { Mic, MicOff } from "lucide-react";
 
-// Client component that safely uses window
-function InterviewContent() {
-  const router = useRouter();
-  const [documentId, setDocumentId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [questions, setQuestions] = useState<any[]>([]);
-  const [jobData, setJobData] = useState<any>(null);
-  const [sessionId, setSessionId] = useState<string>("");
-  const [jobDescription, setJobDescription] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const searchParams = new URLSearchParams(window.location.search);
-      const docId = searchParams.get("documentId");
-      const pastedJob = localStorage.getItem("pastedJobDescription");
-
-      if (docId && pastedJob) {
-        setDocumentId(docId);
-        setJobDescription(pastedJob);
-      } else {
-        setError("Missing job description or document ID.");
-        setLoading(false);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!documentId || !jobDescription) return;
-
-    async function fetchQuestions() {
-      try {
-        if (!loading) setLoading(true);
-
-        const res = await fetch("/.netlify/functions/generate-questions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ jobDescription }),
-        });
-
-        const data = await res.json();
-
-        if (!data.questions || data.questions.length < 3) {
-          throw new Error("Not enough questions returned from Claude.");
-        }
-
-        const parsedQuestions = data.questions;
-
-        const fakeJobData = {
-          jobTitle: "Custom Role",
-          company: "Company Name",
-          requiredSkills: [],
-          responsibilities: [],
-          qualifications: [],
-          companyValues: [],
-        };
-
-        setQuestions(parsedQuestions);
-        setJobData(fakeJobData);
-        setSessionId(`session_${Date.now()}`);
-        setLoading(false);
-      } catch (error) {
-        console.error("Error fetching questions:", error);
-        setError("Failed to generate interview questions. Please try again.");
-        setLoading(false);
-      }
-    }
-
-    fetchQuestions();
-  }, [documentId, jobDescription]);
-
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <div className="w-full max-w-md p-8 bg-slate-800 rounded-lg shadow-md border border-slate-700">
-          <h1 className="text-2xl font-bold text-center text-white mb-6">
-            Preparing Your Interview
-          </h1>
-          <div className="space-y-4">
-            <div className="w-full bg-slate-700 rounded-full h-2.5 mb-4">
-              <div
-                className="bg-teal-500 h-2.5 rounded-full animate-pulse"
-                style={{ width: "70%" }}
-              ></div>
-            </div>
-            <p className="text-center text-slate-300">
-              Analyzing job description and generating a tailored interview...
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <div className="w-full max-w-md p-8 bg-slate-800 rounded-lg shadow-md border border-slate-700">
-          <h1 className="text-2xl font-bold text-center text-red-400 mb-6">Error</h1>
-          <p className="text-center text-slate-300 mb-6">{error}</p>
-          <div className="flex justify-center">
-            <button
-              onClick={() => router.push("/")}
-              className="px-4 py-2 bg-teal-500 text-white rounded-md hover:bg-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 focus:ring-offset-slate-800"
-            >
-              Go Back
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen py-8 px-4">
-      <div className="max-w-4xl mx-auto">
-        <header className="mb-8">
-          <h1 className="text-3xl font-bold text-white">The IG Interview Coach</h1>
-          <p className="text-slate-300 mt-2">
-            Position: {jobData?.jobTitle || "Software Engineer"} at{" "}
-            {jobData?.company || "Company"}
-          </p>
-        </header>
-
-        {questions.length > 0 && jobData && (
-          <InterviewSession
-            questions={questions}
-            jobData={jobData}
-            sessionId={sessionId}
-          />
-        )}
-      </div>
-    </div>
-  );
+interface InterviewSessionProps {
+  questions: any[];
+  jobData: any;
+  sessionId: string;
 }
 
-// Main page component with Suspense wrapper
-export default function InterviewPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="flex flex-col items-center justify-center min-h-screen p-4">
-          <div className="w-full max-w-md p-8 bg-slate-800 rounded-lg shadow-md border border-slate-700">
-            <h1 className="text-2xl font-bold text-center text-white mb-6">
-              Loading Interview
-            </h1>
-            <div className="w-full bg-slate-700 rounded-full h-2.5 mb-4">
-              <div
-                className="bg-teal-500 h-2.5 rounded-full animate-pulse"
-                style={{ width: "70%" }}
-              ></div>
-            </div>
-          </div>
-        </div>
+export function InterviewSession({ questions: initialQuestions, jobData, sessionId }: InterviewSessionProps) {
+  const router = useRouter();
+
+  // State variables
+  const [questions, setQuestions] = useState<any[]>(initialQuestions.slice(0, 3)); // Only use the first 3 questions initially
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [answers, setAnswers] = useState<string[]>([]);
+  const [currentAnswer, setCurrentAnswer] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isFollowUp, setIsFollowUp] = useState(false);
+  const [isLoadingFollowUp, setIsLoadingFollowUp] = useState(false);
+  const [followUpQuestion, setFollowUpQuestion] = useState<string | null>(null);
+  const [finalsInjected, setFinalsInjected] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [audioRecorder, setAudioRecorder] = useState<any>(null);
+  const [recordingError, setRecordingError] = useState<string | null>(null);
+  const [recordingFormat, setRecordingFormat] = useState<string>("audio/webm");
+  const [interviewStage, setInterviewStage] = useState<"main" | "final">("main");
+
+  const currentQuestion = isFollowUp ? { text: followUpQuestion ?? "" } : questions[currentQuestionIndex];
+
+  // Load audio recorder
+  useEffect(() => {
+    import("@/lib/whisper").then(({ AudioRecorder }) => {
+      if (AudioRecorder.isSupported()) {
+        setAudioRecorder(new AudioRecorder());
       }
-    >
-      <InterviewContent />
-    </Suspense>
+    });
+  }, []);
+
+  // Handle text input
+  const handleAnswerChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setCurrentAnswer(e.target.value);
+  };
+
+  // Calculate progress based on our 3+3+2 structure
+  const calculateProgress = () => {
+    // Total steps: 3 main questions + 3 follow-ups + 2 final questions = 8 steps
+    const totalSteps = 8;
+    
+    let currentStep = 0;
+    
+    if (interviewStage === "main") {
+      // During main questions (0, 1, 2)
+      if (isFollowUp) {
+        // Follow-up questions are odd steps (1, 3, 5)
+        currentStep = (currentQuestionIndex * 2) + 1;
+      } else {
+        // Main questions are even steps (0, 2, 4)
+        currentStep = currentQuestionIndex * 2;
+      }
+    } else {
+      // Final questions (6, 7) - after all main Q+followups
+      currentStep = 6 + currentQuestionIndex;
+    }
+    
+    return (currentStep / totalSteps) * 100;
+  };
+
+  // Toggle audio recording
+  const toggleRecording = async () => {
+    if (!audioRecorder) {
+      setRecordingError("Audio recording is not supported in your browser");
+      return;
+    }
+
+    setRecordingError(null);
+
+    try {
+      if (!isRecording) {
+        await audioRecorder.startRecording();
+        setIsRecording(true);
+      } else {
+        const audioBlob = await audioRecorder.stopRecording();
+        setIsRecording(false);
+
+        // Log audio information for debugging
+        console.log("Recorded audio MIME type:", audioBlob.type);
+        console.log("Recorded audio size:", audioBlob.size, "bytes");
+        
+        // Check if recording has content
+        if (!audioBlob || audioBlob.size < 100) {
+          setRecordingError("The recording appears to be empty. Please try again or type your response.");
+          return;
+        }
+        
+        // Update the recording format state
+        setRecordingFormat(audioBlob.type || "audio/webm");
+
+        setCurrentAnswer(currentAnswer + (currentAnswer ? "\n\n" : "") + "Transcribing audio...");
+
+        // Create a proper File object instead of using the Blob directly
+        const fileName = `recording-${Date.now()}.webm`;
+        const audioFile = new File([audioBlob], fileName, { 
+          type: audioBlob.type || "audio/webm" 
+        });
+
+        const formData = new FormData();
+        formData.append("file", audioFile);
+
+        try {
+          const response = await fetch("/.netlify/functions/transcribe", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error("Server error:", errorText);
+            throw new Error(`Server returned ${response.status}: ${errorText}`);
+          }
+
+          const data = await response.json();
+          
+          if (!data.text) {
+            throw new Error("No transcription returned from server");
+          }
+          
+          const transcription = data.text;
+          
+          // Replace the placeholder with the actual transcription
+          setCurrentAnswer(currentAnswer => currentAnswer.replace("Transcribing audio...", transcription));
+        } catch (transcriptionError) {
+          console.error("Transcription error:", transcriptionError);
+          // Replace the placeholder with an error message
+          setCurrentAnswer(currentAnswer => 
+            currentAnswer.replace("Transcribing audio...", "[Transcription failed. Please try again or type your response.]")
+          );
+          setRecordingError(`Transcription failed: ${transcriptionError.message || "Unknown error"}`);
+        }
+      }
+    } catch (error) {
+      console.error("Error with recording:", error);
+      setIsRecording(false);
+      setRecordingError("Failed to access microphone. Please check your permissions and try again.");
+    }
+  };
+
+  // Submit answer for main questions
+  const handleSubmitAnswer = async () => {
+    // Ensure there's a meaningful answer (not just whitespace or very short)
+    if (!currentAnswer.trim() || currentAnswer.trim().length < 3 || isSubmitting) {
+      if (currentAnswer.trim().length < 3 && currentAnswer.trim().length > 0) {
+        setRecordingError("Please provide a more detailed answer before submitting.");
+      }
+      return;
+    }
+    
+    setIsSubmitting(true);
+    setRecordingError(null); // Clear any previous errors
+
+    try {
+      const updatedAnswers = [...answers, currentAnswer];
+      setAnswers(updatedAnswers);
+
+      // Only generate follow-ups during main questions and if not already in a follow-up
+      if (interviewStage === "main" && !isFollowUp) {
+        setIsLoadingFollowUp(true);
+        try {
+          const followUp = await getFollowUpFromClaude(
+            questions[currentQuestionIndex]?.text,
+            currentAnswer
+          );
+          setFollowUpQuestion(followUp);
+          setIsFollowUp(true);
+          setCurrentAnswer("");
+        } catch (followUpError) {
+          console.error("Error getting follow-up:", followUpError);
+          // Fallback follow-up that maintains the interview simulation
+          setFollowUpQuestion("Can you elaborate more on your approach to that situation? Perhaps share a specific example.");
+          setIsFollowUp(true);
+          setCurrentAnswer("");
+        } finally {
+          setIsLoadingFollowUp(false);
+        }
+      } else {
+        moveToNextQuestion();
+      }
+    } catch (error) {
+      console.error("Error submitting answer:", error);
+      moveToNextQuestion();
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Submit answer for follow-up questions
+  const handleSubmitFollowUp = () => {
+    if (!currentAnswer.trim() || isSubmitting) return;
+    const updatedAnswers = [...answers, currentAnswer];
+    setAnswers(updatedAnswers);
+    setIsFollowUp(false);
+    setFollowUpQuestion(null);
+    setCurrentAnswer("");
+    moveToNextQuestion();
+  };
+
+  // Move to next question or stage
+  const moveToNextQuestion = async () => {
+    if (interviewStage === "main") {
+      const isLastMainQuestion = currentQuestionIndex === 2;
+      
+      if (!isLastMainQuestion) {
+        // Move to the next main question
+        setCurrentQuestionIndex(currentQuestionIndex + 1);
+        setCurrentAnswer("");
+      } else {
+        // Transition to the final questions stage
+        try {
+          const finalQs = await getFinalQuestionsFromClaude();
+          setQuestions([
+            { text: finalQs.classic },
+            { text: finalQs.curveball }
+          ]);
+          setInterviewStage("final");
+          setCurrentQuestionIndex(0);
+          setCurrentAnswer("");
+        } catch (error) {
+          console.error("Failed to fetch final Claude questions", error);
+          handleInterviewComplete();
+        }
+      }
+    } else {
+      // In final stage
+      const isLastFinalQuestion = currentQuestionIndex === 1;
+      
+      if (!isLastFinalQuestion) {
+        // Move to the next final question
+        setCurrentQuestionIndex(currentQuestionIndex + 1);
+        setCurrentAnswer("");
+      } else {
+        // Interview is complete
+        handleInterviewComplete();
+      }
+    }
+  };
+
+  // Complete the interview
+  const handleInterviewComplete = () => {
+    router.push(`/feedback?sessionId=${sessionId}`);
+  };
+
+  // Calculate progress percentage
+  const progressPercentage = calculateProgress();
+
+  // Get follow-up question from Claude
+  const getFollowUpFromClaude = async (originalQuestion: string, userAnswer: string): Promise<string> => {
+    if (!originalQuestion.trim() || !userAnswer.trim() || userAnswer.trim().length < 3) {
+      return "I'd like to understand more about your approach. Could you give me a specific example from your experience?";
+    }
+    
+    try {
+      const response = await fetch("/.netlify/functions/followup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ originalQuestion, userAnswer })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return data.followUpQuestion || "Could you expand more on that answer with a concrete example?";
+    } catch (error) {
+      console.error("Error getting follow-up:", error);
+      return "That's interesting. Can you tell me more about a specific situation where you demonstrated that skill?";
+    }
+  };
+
+  // Get final classic and curveball questions
+  const getFinalQuestionsFromClaude = async (): Promise<{ classic: string; curveball: string }> => {
+    try {
+      const res = await fetch("/.netlify/functions/final-questions");
+      
+      if (!res.ok) {
+        throw new Error(`Server returned ${res.status}`);
+      }
+      
+      const data = await res.json();
+
+      if (!data.classic || !data.curveball) {
+        throw new Error("Missing classic or curveball questions");
+      }
+
+      return {
+        classic: data.classic,
+        curveball: data.curveball
+      };
+    } catch (error) {
+      console.error("Error getting final questions:", error);
+      // Fallback questions
+      return {
+        classic: "What would you say are your greatest strengths, and how do they align with this role?",
+        curveball: "If you could have dinner with any three people, living or dead, who would they be and why?"
+      };
+    }
+  };
+
+  return (
+    <div className="max-w-3xl mx-auto p-6 bg-slate-800 rounded-lg shadow-md border border-slate-700 text-white">
+      <div className="mb-6">
+        <h2 className="text-xl font-bold mb-2">
+          {isFollowUp ? "Follow-Up Question" : (
+            interviewStage === "main" 
+              ? `Question ${currentQuestionIndex + 1} of 3` 
+              : `${currentQuestionIndex === 0 ? "Traditional" : "Curveball"} Question`
+          )}
+        </h2>
+        <p className="text-slate-300">{currentQuestion.text}</p>
+      </div>
+
+      <textarea
+        rows={6}
+        value={currentAnswer}
+        onChange={handleAnswerChange}
+        placeholder="Type your answer here..."
+        className="w-full p-4 text-white bg-slate-900 border border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 mb-4"
+      />
+
+      {recordingError && (
+        <p className="text-red-400 mb-4">{recordingError}</p>
+      )}
+
+      {recordingFormat && recordingFormat !== "audio/webm" && (
+        <p className="text-yellow-400 mb-4">
+          Your browser is recording in {recordingFormat} format. If you experience issues, try typing your response instead.
+        </p>
+      )}
+
+      <div className="flex items-center justify-between mb-4">
+        <button
+          onClick={isFollowUp ? handleSubmitFollowUp : handleSubmitAnswer}
+          disabled={!currentAnswer.trim() || isSubmitting}
+          className="bg-teal-500 hover:bg-teal-600 text-white font-semibold py-2 px-6 rounded disabled:opacity-50"
+        >
+          {isSubmitting ? "Submitting..." : isFollowUp ? "Submit Follow-Up" : "Submit Answer"}
+        </button>
+
+        {audioRecorder && (
+          <button
+            onClick={toggleRecording}
+            className={`ml-4 flex items-center gap-2 px-4 py-2 rounded ${
+              isRecording ? "bg-red-600 hover:bg-red-700" : "bg-slate-600 hover:bg-slate-700"
+            }`}
+          >
+            {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
+            {isRecording ? "Stop Recording" : "Record"}
+          </button>
+        )}
+      </div>
+
+      <div className="w-full bg-slate-700 rounded-full h-2.5">
+        <div
+          className="bg-teal-500 h-2.5 rounded-full transition-all duration-500"
+          style={{ width: `${progressPercentage}%` }}
+        />
+      </div>
+
+      <div className="mt-2 text-right text-sm text-slate-400">
+        {interviewStage === "main" 
+          ? `${isFollowUp ? "Follow-up" : "Question"} ${currentQuestionIndex + 1}/3`
+          : `Final Questions ${currentQuestionIndex + 1}/2`
+        }
+      </div>
+
+      {isLoadingFollowUp && (
+        <p className="text-slate-400 mt-4 animate-pulse">Generating follow-up question...</p>
+      )}
+    </div>
   );
 }
 
