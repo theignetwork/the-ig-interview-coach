@@ -13,7 +13,8 @@ interface InterviewSessionProps {
 export function InterviewSession({ questions: initialQuestions, jobData, sessionId }: InterviewSessionProps) {
   const router = useRouter();
 
-  const [questions, setQuestions] = useState<any[]>(initialQuestions);
+  // State variables
+  const [questions, setQuestions] = useState<any[]>(initialQuestions.slice(0, 3)); // Only use the first 3 questions initially
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<string[]>([]);
   const [currentAnswer, setCurrentAnswer] = useState("");
@@ -26,9 +27,11 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
   const [audioRecorder, setAudioRecorder] = useState<any>(null);
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [recordingFormat, setRecordingFormat] = useState<string>("audio/webm");
+  const [interviewStage, setInterviewStage] = useState<"main" | "final">("main");
 
   const currentQuestion = isFollowUp ? { text: followUpQuestion ?? "" } : questions[currentQuestionIndex];
 
+  // Load audio recorder
   useEffect(() => {
     import("@/lib/whisper").then(({ AudioRecorder }) => {
       if (AudioRecorder.isSupported()) {
@@ -37,10 +40,36 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
     });
   }, []);
 
+  // Handle text input
   const handleAnswerChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setCurrentAnswer(e.target.value);
   };
 
+  // Calculate progress based on our 3+3+2 structure
+  const calculateProgress = () => {
+    // Total steps: 3 main questions + 3 follow-ups + 2 final questions = 8 steps
+    const totalSteps = 8;
+    
+    let currentStep = 0;
+    
+    if (interviewStage === "main") {
+      // During main questions (0, 1, 2)
+      if (isFollowUp) {
+        // Follow-up questions are odd steps (1, 3, 5)
+        currentStep = (currentQuestionIndex * 2) + 1;
+      } else {
+        // Main questions are even steps (0, 2, 4)
+        currentStep = currentQuestionIndex * 2;
+      }
+    } else {
+      // Final questions (6, 7) - after all main Q+followups
+      currentStep = 6 + currentQuestionIndex;
+    }
+    
+    return (currentStep / totalSteps) * 100;
+  };
+
+  // Toggle audio recording
   const toggleRecording = async () => {
     if (!audioRecorder) {
       setRecordingError("Audio recording is not supported in your browser");
@@ -60,6 +89,12 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
         // Log audio information for debugging
         console.log("Recorded audio MIME type:", audioBlob.type);
         console.log("Recorded audio size:", audioBlob.size, "bytes");
+        
+        // Check if recording has content
+        if (!audioBlob || audioBlob.size < 100) {
+          setRecordingError("The recording appears to be empty. Please try again or type your response.");
+          return;
+        }
         
         // Update the recording format state
         setRecordingFormat(audioBlob.type || "audio/webm");
@@ -113,6 +148,7 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
     }
   };
 
+  // Submit answer for main questions
   const handleSubmitAnswer = async () => {
     if (!currentAnswer.trim() || isSubmitting) return;
     setIsSubmitting(true);
@@ -121,18 +157,26 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
       const updatedAnswers = [...answers, currentAnswer];
       setAnswers(updatedAnswers);
 
-      const isMainQuestion = currentQuestionIndex % 2 === 0;
-
-      if (isMainQuestion) {
+      // Only generate follow-ups during main questions and if not already in a follow-up
+      if (interviewStage === "main" && !isFollowUp) {
         setIsLoadingFollowUp(true);
-        const followUp = await getFollowUpFromClaude(
-          questions[currentQuestionIndex]?.text,
-          currentAnswer
-        );
-        setFollowUpQuestion(followUp);
-        setIsFollowUp(true);
-        setCurrentAnswer("");
-        setIsLoadingFollowUp(false);
+        try {
+          const followUp = await getFollowUpFromClaude(
+            questions[currentQuestionIndex]?.text,
+            currentAnswer
+          );
+          setFollowUpQuestion(followUp);
+          setIsFollowUp(true);
+          setCurrentAnswer("");
+        } catch (followUpError) {
+          console.error("Error getting follow-up:", followUpError);
+          // Fallback follow-up that maintains the interview simulation
+          setFollowUpQuestion("That's interesting. Could you elaborate a bit more on that specific aspect?");
+          setIsFollowUp(true);
+          setCurrentAnswer("");
+        } finally {
+          setIsLoadingFollowUp(false);
+        }
       } else {
         moveToNextQuestion();
       }
@@ -144,6 +188,7 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
     }
   };
 
+  // Submit answer for follow-up questions
   const handleSubmitFollowUp = () => {
     if (!currentAnswer.trim() || isSubmitting) return;
     const updatedAnswers = [...answers, currentAnswer];
@@ -154,64 +199,117 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
     moveToNextQuestion();
   };
 
+  // Move to next question or stage
   const moveToNextQuestion = async () => {
-    const hasMoreQuestions = currentQuestionIndex < questions.length - 1;
-
-    if (hasMoreQuestions) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
-      setCurrentAnswer("");
-    } else if (!finalsInjected) {
-      try {
-        const finalQs = await getFinalQuestionsFromClaude();
-        const extra = [{ text: finalQs.classic }, { text: finalQs.curveball }];
-        setQuestions(prev => [...prev, ...extra]);
-        setFinalsInjected(true);
-        setCurrentQuestionIndex(prev => prev + 1);
+    if (interviewStage === "main") {
+      const isLastMainQuestion = currentQuestionIndex === 2;
+      
+      if (!isLastMainQuestion) {
+        // Move to the next main question
+        setCurrentQuestionIndex(currentQuestionIndex + 1);
         setCurrentAnswer("");
-      } catch (error) {
-        console.error("Failed to fetch final Claude questions", error);
-        handleInterviewComplete();
+      } else {
+        // Transition to the final questions stage
+        try {
+          const finalQs = await getFinalQuestionsFromClaude();
+          setQuestions([
+            { text: finalQs.classic },
+            { text: finalQs.curveball }
+          ]);
+          setInterviewStage("final");
+          setCurrentQuestionIndex(0);
+          setCurrentAnswer("");
+        } catch (error) {
+          console.error("Failed to fetch final Claude questions", error);
+          handleInterviewComplete();
+        }
       }
     } else {
-      handleInterviewComplete();
+      // In final stage
+      const isLastFinalQuestion = currentQuestionIndex === 1;
+      
+      if (!isLastFinalQuestion) {
+        // Move to the next final question
+        setCurrentQuestionIndex(currentQuestionIndex + 1);
+        setCurrentAnswer("");
+      } else {
+        // Interview is complete
+        handleInterviewComplete();
+      }
     }
   };
 
+  // Complete the interview
   const handleInterviewComplete = () => {
     router.push(`/feedback?sessionId=${sessionId}`);
   };
 
-  const progressPercentage = ((currentQuestionIndex + (isFollowUp ? 0.5 : 1)) / (questions.length * 1.5)) * 100;
+  // Calculate progress percentage
+  const progressPercentage = calculateProgress();
 
+  // Get follow-up question from Claude
   const getFollowUpFromClaude = async (originalQuestion: string, userAnswer: string): Promise<string> => {
-    const response = await fetch("/.netlify/functions/followup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ originalQuestion, userAnswer })
-    });
-    const data = await response.json();
-    return data.followUpQuestion;
+    if (!originalQuestion.trim() || !userAnswer.trim()) {
+      return "I'd like to understand more about your approach. Could you give me a specific example from your experience?";
+    }
+    
+    try {
+      const response = await fetch("/.netlify/functions/followup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ originalQuestion, userAnswer })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return data.followUpQuestion || "Could you expand more on that answer with a concrete example?";
+    } catch (error) {
+      console.error("Error getting follow-up:", error);
+      return "That's interesting. Can you tell me more about a specific situation where you demonstrated that skill?";
+    }
   };
 
+  // Get final classic and curveball questions
   const getFinalQuestionsFromClaude = async (): Promise<{ classic: string; curveball: string }> => {
-    const res = await fetch("/.netlify/functions/final-questions");
-    const data = await res.json();
+    try {
+      const res = await fetch("/.netlify/functions/final-questions");
+      
+      if (!res.ok) {
+        throw new Error(`Server returned ${res.status}`);
+      }
+      
+      const data = await res.json();
 
-    if (!data.classic || !data.curveball) {
-      throw new Error("Missing classic or curveball questions");
+      if (!data.classic || !data.curveball) {
+        throw new Error("Missing classic or curveball questions");
+      }
+
+      return {
+        classic: data.classic,
+        curveball: data.curveball
+      };
+    } catch (error) {
+      console.error("Error getting final questions:", error);
+      // Fallback questions
+      return {
+        classic: "What would you say are your greatest strengths, and how do they align with this role?",
+        curveball: "If you could have dinner with any three people, living or dead, who would they be and why?"
+      };
     }
-
-    return {
-      classic: data.classic,
-      curveball: data.curveball
-    };
   };
 
   return (
     <div className="max-w-3xl mx-auto p-6 bg-slate-800 rounded-lg shadow-md border border-slate-700 text-white">
       <div className="mb-6">
         <h2 className="text-xl font-bold mb-2">
-          {isFollowUp ? "Follow-Up Question" : `Question ${currentQuestionIndex + 1}`}
+          {isFollowUp ? "Follow-Up Question" : (
+            interviewStage === "main" 
+              ? `Question ${currentQuestionIndex + 1} of 3` 
+              : `${currentQuestionIndex === 0 ? "Traditional" : "Curveball"} Question`
+          )}
         </h2>
         <p className="text-slate-300">{currentQuestion.text}</p>
       </div>
@@ -261,6 +359,13 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
           className="bg-teal-500 h-2.5 rounded-full transition-all duration-500"
           style={{ width: `${progressPercentage}%` }}
         />
+      </div>
+
+      <div className="mt-2 text-right text-sm text-slate-400">
+        {interviewStage === "main" 
+          ? `${isFollowUp ? "Follow-up" : "Question"} ${currentQuestionIndex + 1}/3`
+          : `Final Questions ${currentQuestionIndex + 1}/2`
+        }
       </div>
 
       {isLoadingFollowUp && (
