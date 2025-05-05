@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Mic, MicOff } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Mic, MicOff } from "lucide-react";
 
 interface InterviewSessionProps {
   questions: any[];
@@ -16,14 +16,12 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
   const [questions, setQuestions] = useState<any[]>(initialQuestions);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<string[]>([]);
-  const [currentAnswer, setCurrentAnswer] = useState('');
+  const [currentAnswer, setCurrentAnswer] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFollowUp, setIsFollowUp] = useState(false);
   const [isLoadingFollowUp, setIsLoadingFollowUp] = useState(false);
   const [followUpQuestion, setFollowUpQuestion] = useState<string | null>(null);
-  const [finalsInjected, setFinalsInjected] = useState(false); // NEW
-
-  const [analysisResults, setAnalysisResults] = useState<Record<string, any>>({});
+  const [finalsInjected, setFinalsInjected] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [audioRecorder, setAudioRecorder] = useState<any>(null);
   const [recordingError, setRecordingError] = useState<string | null>(null);
@@ -31,7 +29,7 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
   const currentQuestion = isFollowUp ? { text: followUpQuestion ?? "" } : questions[currentQuestionIndex];
 
   useEffect(() => {
-    import('@/lib/whisper').then(({ AudioRecorder }) => {
+    import("@/lib/whisper").then(({ AudioRecorder }) => {
       if (AudioRecorder.isSupported()) {
         setAudioRecorder(new AudioRecorder());
       }
@@ -44,7 +42,7 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
 
   const toggleRecording = async () => {
     if (!audioRecorder) {
-      setRecordingError('Audio recording is not supported in your browser');
+      setRecordingError("Audio recording is not supported in your browser");
       return;
     }
 
@@ -58,15 +56,15 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
         const audioBlob = await audioRecorder.stopRecording();
         setIsRecording(false);
 
-        setCurrentAnswer(currentAnswer + (currentAnswer ? '\n\n' : '') + "Transcribing audio...");
+        setCurrentAnswer(currentAnswer + (currentAnswer ? "\n\n" : "") + "Transcribing audio...");
         await new Promise(resolve => setTimeout(resolve, 1500));
         const transcription = "This is a simulated transcription of your voice recording.";
         setCurrentAnswer(currentAnswer.replace("Transcribing audio...", transcription));
       }
     } catch (error) {
-      console.error('Error with recording:', error);
+      console.error("Error with recording:", error);
       setIsRecording(false);
-      setRecordingError('Failed to access microphone. Please check your permissions and try again.');
+      setRecordingError("Failed to access microphone. Please check your permissions and try again.");
     }
   };
 
@@ -88,13 +86,13 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
         );
         setFollowUpQuestion(followUp);
         setIsFollowUp(true);
-        setCurrentAnswer('');
+        setCurrentAnswer("");
         setIsLoadingFollowUp(false);
       } else {
         moveToNextQuestion();
       }
     } catch (error) {
-      console.error('Error submitting answer:', error);
+      console.error("Error submitting answer:", error);
       moveToNextQuestion();
     } finally {
       setIsSubmitting(false);
@@ -107,17 +105,16 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
     setAnswers(updatedAnswers);
     setIsFollowUp(false);
     setFollowUpQuestion(null);
-    setCurrentAnswer('');
+    setCurrentAnswer("");
     moveToNextQuestion();
   };
 
-  // ✅ UPDATED: Smart injection of classic + curveball questions at the end
   const moveToNextQuestion = async () => {
     const hasMoreQuestions = currentQuestionIndex < questions.length - 1;
 
     if (hasMoreQuestions) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
-      setCurrentAnswer('');
+      setCurrentAnswer("");
     } else if (!finalsInjected) {
       try {
         const finalQs = await getFinalQuestionsFromClaude();
@@ -125,7 +122,7 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
         setQuestions(prev => [...prev, ...extra]);
         setFinalsInjected(true);
         setCurrentQuestionIndex(prev => prev + 1);
-        setCurrentAnswer('');
+        setCurrentAnswer("");
       } catch (error) {
         console.error("Failed to fetch final Claude questions", error);
         handleInterviewComplete();
@@ -166,12 +163,62 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
   };
 
   return (
-    <div className="max-w-3xl mx-auto p-6 bg-slate-800 rounded-lg shadow-md border border-slate-700">
-      {/* ... UI stays unchanged ... */}
-      {/* You can keep your existing JSX layout here exactly as it is */}
+    <div className="max-w-3xl mx-auto p-6 bg-slate-800 rounded-lg shadow-md border border-slate-700 text-white">
+      <div className="mb-6">
+        <h2 className="text-xl font-bold mb-2">
+          {isFollowUp ? "Follow-Up Question" : `Question ${currentQuestionIndex + 1}`}
+        </h2>
+        <p className="text-slate-300">{currentQuestion.text}</p>
+      </div>
+
+      <textarea
+        rows={6}
+        value={currentAnswer}
+        onChange={handleAnswerChange}
+        placeholder="Type your answer here..."
+        className="w-full p-4 text-white bg-slate-900 border border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 mb-4"
+      />
+
+      {recordingError && (
+        <p className="text-red-400 mb-4">{recordingError}</p>
+      )}
+
+      <div className="flex items-center justify-between mb-4">
+        <button
+          onClick={isFollowUp ? handleSubmitFollowUp : handleSubmitAnswer}
+          disabled={!currentAnswer.trim() || isSubmitting}
+          className="bg-teal-500 hover:bg-teal-600 text-white font-semibold py-2 px-6 rounded disabled:opacity-50"
+        >
+          {isSubmitting ? "Submitting..." : isFollowUp ? "Submit Follow-Up" : "Submit Answer"}
+        </button>
+
+        {audioRecorder && (
+          <button
+            onClick={toggleRecording}
+            className={`ml-4 flex items-center gap-2 px-4 py-2 rounded ${
+              isRecording ? "bg-red-600 hover:bg-red-700" : "bg-slate-600 hover:bg-slate-700"
+            }`}
+          >
+            {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
+            {isRecording ? "Stop Recording" : "Record"}
+          </button>
+        )}
+      </div>
+
+      <div className="w-full bg-slate-700 rounded-full h-2.5">
+        <div
+          className="bg-teal-500 h-2.5 rounded-full transition-all duration-500"
+          style={{ width: `${progressPercentage}%` }}
+        />
+      </div>
+
+      {isLoadingFollowUp && (
+        <p className="text-slate-400 mt-4 animate-pulse">Generating follow-up question...</p>
+      )}
     </div>
   );
 }
+
 
 
 
