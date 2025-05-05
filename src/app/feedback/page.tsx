@@ -139,4 +139,125 @@ export default function FeedbackPage() {
               <div className="absolute inset-0 flex items-center justify-center">
                 <span className="text-5xl font-bold text-teal-400">{report.overallScore}</span>
               </div>
-              <svg className="absolute inset-0" width="100%" height="100%" viewBox="0 0 1
+              <svg className="absolute inset-0" width="100%" height="100%" viewBox="0 0 100 100">
+                <circle 
+                  cx="50" cy="50" r="45" 
+                  fill="none" 
+                  stroke="#1e293b" 
+                  strokeWidth="10"
+                />
+                <circle 
+                  cx="50" cy="50" r="45" 
+                  fill="none" 
+                  stroke="#2dd4bf" 
+                  strokeWidth="5"
+                  strokeDasharray={`${2 * Math.PI * 45 * report.overallScore / 100} ${2 * Math.PI * 45 * (1 - report.overallScore / 100)}`}
+                  strokeDashoffset="0"
+                  strokeLinecap="round"
+                  transform="rotate(-90 50 50)"
+                />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-xl font-bold mb-2">Overall Score</h2>
+              <p className="text-slate-300">{report.overallFeedback}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+          <div className="bg-slate-800 p-6 rounded-lg shadow-md border border-slate-700">
+            <h2 className="text-xl font-bold mb-4 text-teal-400">Key Strengths</h2>
+            <ul className="space-y-2">
+              {report.keyStrengths.map((strength: string, i: number) => (
+                <li key={i} className="flex items-start">
+                  <span className="text-teal-400 mr-2">•</span>
+                  <span>{strength}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          
+          <div className="bg-slate-800 p-6 rounded-lg shadow-md border border-slate-700">
+            <h2 className="text-xl font-bold mb-4 text-teal-400">Areas for Improvement</h2>
+            <ul className="space-y-2">
+              {report.areasForImprovement.map((area: string, i: number) => (
+                <li key={i} className="flex items-start">
+                  <span className="text-teal-400 mr-2">•</span>
+                  <span>{area}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+        
+        {report.dangerZones && report.dangerZones.length > 0 && (
+          <div className="bg-slate-800 p-6 rounded-lg shadow-md border border-slate-700 mb-8">
+            <h2 className="text-xl font-bold mb-4 text-yellow-500">
+              <span className="mr-2">⚠️</span>
+              Danger Zone Alerts (Potential Red Flags)
+            </h2>
+            <p className="mb-4">Red Flag Risk: <span className="font-semibold">{report.dangerZoneRisk}</span></p>
+            <ul className="space-y-2">
+              {report.dangerZones.map((flag: string, i: number) => (
+                <li key={i} className="flex items-start">
+                  <span className="text-red-500 mr-2">✕</span>
+                  <span>{flag}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        
+        <h2 className="text-2xl font-bold mb-6">Question-by-Question Feedback</h2>
+        
+        {report.questionFeedback.map((qFeedback: any, i: number) => (
+          <div key={i} className="bg-slate-800 p-6 rounded-lg shadow-md border border-slate-700 mb-6">
+            <div className="flex items-center mb-4">
+              <div className="bg-slate-700 rounded-lg w-16 h-16 flex items-center justify-center mr-4">
+                <span className="text-2xl font-bold text-teal-400">{qFeedback.score}</span>
+              </div>
+              <h3 className="text-lg font-semibold">{qFeedback.question}</h3>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <h4 className="font-semibold mb-2">Strengths</h4>
+                <ul className="space-y-1">
+                  {qFeedback.strengths.map((strength: string, j: number) => (
+                    <li key={j} className="flex items-start text-sm">
+                      <span className="text-teal-400 mr-2">•</span>
+                      <span>{strength}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              
+              <div>
+                <h4 className="font-semibold mb-2">Areas to Improve</h4>
+                <ul className="space-y-1">
+                  {qFeedback.improvements.map((improvement: string, j: number) => (
+                    <li key={j} className="flex items-start text-sm">
+                      <span className="text-teal-400 mr-2">•</span>
+                      <span>{improvement}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        ))}
+        
+        <div className="text-center mt-12 mb-8">
+          <p className="text-slate-400 mb-4">Powered by The IG Network</p>
+          <button
+            onClick={() => router.push("/")}
+            className="px-6 py-2 bg-teal-500 text-white rounded-md hover:bg-teal-600"
+          >
+            Try Another Interview
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
