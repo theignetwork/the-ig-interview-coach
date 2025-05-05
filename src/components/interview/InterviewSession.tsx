@@ -57,8 +57,18 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
         setIsRecording(false);
 
         setCurrentAnswer(currentAnswer + (currentAnswer ? "\n\n" : "") + "Transcribing audio...");
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        const transcription = "This is a simulated transcription of your voice recording.";
+
+        const formData = new FormData();
+        formData.append("file", audioBlob, "recording.webm");
+
+        const response = await fetch("/.netlify/functions/transcribe", {
+          method: "POST",
+          body: formData,
+        });
+
+        const data = await response.json();
+        const transcription = data.transcript || "[No transcription available]";
+
         setCurrentAnswer(currentAnswer.replace("Transcribing audio...", transcription));
       }
     } catch (error) {
@@ -218,6 +228,7 @@ export function InterviewSession({ questions: initialQuestions, jobData, session
     </div>
   );
 }
+
 
 
 
