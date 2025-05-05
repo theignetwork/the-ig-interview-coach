@@ -132,10 +132,6 @@ function InterviewContent() {
       <div className="max-w-4xl mx-auto">
         <header className="mb-8">
           <h1 className="text-3xl font-bold text-white">The IG Interview Coach</h1>
-          <p className="text-slate-300 mt-2">
-            Position: {jobData?.jobTitle || "Software Engineer"} at{" "}
-            {jobData?.company || "Company"}
-          </p>
         </header>
 
         {questions.length > 0 && jobData && (
