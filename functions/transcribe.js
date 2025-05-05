@@ -23,7 +23,8 @@ exports.handler = async function (event) {
     let fileWriteStream;
 
     busboy.on("file", (_fieldname, file, filename) => {
-      uploadPath = path.join(os.tmpdir(), filename);
+      const safeFilename = typeof filename === "string" ? filename : "upload.webm";
+      uploadPath = path.join(os.tmpdir(), safeFilename);
       fileWriteStream = fs.createWriteStream(uploadPath);
       file.pipe(fileWriteStream);
     });
@@ -55,5 +56,6 @@ exports.handler = async function (event) {
     busboy.end(buffer);
   });
 };
+
 
 
