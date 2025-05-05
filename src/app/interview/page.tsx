@@ -46,17 +46,11 @@ function InterviewContent() {
 
         const data = await res.json();
 
-        if (!data.question) throw new Error("No question returned from Claude");
+        if (!data.questions || data.questions.length < 6) {
+          throw new Error("Not enough questions returned from Claude.");
+        }
 
-        const parsedQuestions = [
-          {
-            id: "q1",
-            text: data.question.trim(),
-            type: "unknown",
-            skill: "unspecified",
-            difficulty: "medium",
-          },
-        ];
+        const parsedQuestions = data.questions;
 
         const fakeJobData = {
           jobTitle: "Custom Role",
@@ -96,7 +90,7 @@ function InterviewContent() {
               ></div>
             </div>
             <p className="text-center text-slate-300">
-              Analyzing job description and generating a tailored interview question...
+              Analyzing job description and generating a tailored interview...
             </p>
           </div>
         </div>
@@ -170,6 +164,7 @@ export default function InterviewPage() {
     </Suspense>
   );
 }
+
 
 
 
