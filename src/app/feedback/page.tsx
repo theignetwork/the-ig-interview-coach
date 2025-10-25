@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { fetchJSONWithRetry } from "@/lib/fetch-retry";
 import { getInterviewById, saveFeedbackReport } from "@/lib/database/interview-service";
+import { BarChart3 } from "lucide-react";
 
 export default function FeedbackPage() {
   const router = useRouter();
@@ -425,12 +426,21 @@ export default function FeedbackPage() {
         
         <div className="text-center mt-12 mb-8">
           <p className="text-slate-400 mb-4">Powered by The IG Network</p>
-          <button
-            onClick={() => router.push("/")}
-            className="px-6 py-2 bg-teal-500 text-white rounded-md hover:bg-teal-600"
-          >
-            Try Another Interview
-          </button>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <button
+              onClick={() => router.push("/dashboard")}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-slate-700 text-white rounded-md hover:bg-slate-600 transition-colors border border-slate-600"
+            >
+              <BarChart3 size={20} />
+              View Dashboard
+            </button>
+            <button
+              onClick={() => router.push("/")}
+              className="px-6 py-3 bg-teal-500 text-white rounded-md hover:bg-teal-600 transition-colors"
+            >
+              Try Another Interview
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { BarChart3 } from "lucide-react";
 
 export default function Home() {
   const router = useRouter();
@@ -40,6 +41,17 @@ export default function Home() {
           <p className="text-xl text-slate-300">
             Practice your interview skills with AI-generated questions based on real job descriptions
           </p>
+
+          {/* Dashboard Link */}
+          <div className="mt-6">
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-slate-700 text-white rounded-md hover:bg-slate-600 transition-colors border border-slate-600"
+            >
+              <BarChart3 size={20} />
+              View Dashboard
+            </button>
+          </div>
         </div>
 
         <div className="bg-slate-800 p-8 rounded-lg shadow-md border border-slate-700">
@@ -79,6 +91,18 @@ export default function Home() {
             <li>Receive follow-up questions based on your responses</li>
             <li>Get feedback and improvement suggestions</li>
           </ol>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="mt-8 text-center">
+          <p className="text-slate-400 mb-4">Already completed an interview?</p>
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-semibold rounded-lg hover:from-teal-600 hover:to-cyan-600 transition-all shadow-lg shadow-teal-500/25"
+          >
+            <BarChart3 size={20} />
+            View Your Dashboard
+          </button>
         </div>
       </div>
     </main>
