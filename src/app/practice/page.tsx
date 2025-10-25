@@ -156,7 +156,7 @@ function PracticeContent() {
           <p className="text-center text-slate-300 mb-6">{error}</p>
           <div className="flex flex-col gap-3">
             <button
-              onClick={() => window.location.href = 'https://igcareercoach.com/oracle-pro'}
+              onClick={() => window.location.href = 'https://interview-oracle-pro.netlify.app'}
               className="px-4 py-2 bg-teal-500 text-white rounded-md hover:bg-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 focus:ring-offset-slate-800"
             >
               Back to Oracle PRO

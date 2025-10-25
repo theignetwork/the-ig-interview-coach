@@ -438,7 +438,7 @@ export default function FeedbackPage() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             {fromOraclePro && (
               <a
-                href="https://igcareercoach.com/oracle-pro"
+                href="https://interview-oracle-pro.netlify.app"
                 className="oracle-return-link"
               >
                 <span className="link-icon">⚡</span>
