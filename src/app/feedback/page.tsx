@@ -7,13 +7,22 @@ import { useRouter } from 'next/navigation';
 function FeedbackContent() {
   const router = useRouter();
   const [sessionId, setSessionId] = useState<string | null>(null);
-  
+  const [fromOraclePro, setFromOraclePro] = useState<boolean>(false);
+
   // Use useEffect to safely access window after component mount
   useEffect(() => {
     // Access window only on the client side
     if (typeof window !== 'undefined') {
       const searchParams = new URLSearchParams(window.location.search);
       setSessionId(searchParams.get('sessionId'));
+
+      // Check if this session came from Oracle PRO
+      const oracleFlag = searchParams.get('from_oracle');
+      const oracleSessionStorage = sessionStorage.getItem('oracle_pro_session');
+
+      if (oracleFlag === 'true' || oracleSessionStorage === 'true') {
+        setFromOraclePro(true);
+      }
     }
   }, []);
   
@@ -322,7 +331,16 @@ function FeedbackContent() {
           </div>
         </div>
         
-        <div className="mt-8 flex justify-center">
+        <div className="mt-8 flex justify-center gap-4">
+          {fromOraclePro && (
+            <a
+              href="https://igcareercoach.com/oracle-pro"
+              className="oracle-return-link"
+            >
+              <span className="link-icon">⚡</span>
+              <span>Back to Oracle PRO</span>
+            </a>
+          )}
           <button
             onClick={() => router.push('/')}
             className="px-6 py-3 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
