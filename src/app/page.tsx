@@ -41,17 +41,6 @@ export default function Home() {
           <p className="text-xl text-slate-300">
             Practice your interview skills with AI-generated questions based on real job descriptions
           </p>
-
-          {/* Dashboard Link */}
-          <div className="mt-6">
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-slate-700 text-white rounded-md hover:bg-slate-600 transition-colors border border-slate-600"
-            >
-              <BarChart3 size={20} />
-              View Dashboard
-            </button>
-          </div>
         </div>
 
         <div className="bg-slate-800 p-8 rounded-lg shadow-md border border-slate-700">
