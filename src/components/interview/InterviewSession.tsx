@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Mic, MicOff } from "lucide-react";
+import { fetchJSONWithRetry, fetchWithRetry } from "@/lib/fetch-retry";
 
 interface InterviewSessionProps {
   questions: any[];
@@ -151,10 +152,18 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
         formData.append("file", audioFile);
 
         try {
-          const response = await fetch("/.netlify/functions/transcribe", {
-            method: "POST",
-            body: formData,
-          });
+          // Use retry logic for transcription (with different settings for file uploads)
+          const response = await fetchWithRetry(
+            "/.netlify/functions/transcribe",
+            {
+              method: "POST",
+              body: formData,
+            },
+            {
+              maxRetries: 2, // Fewer retries for large file uploads
+              initialDelay: 2000, // Longer initial delay
+            }
+          );
 
           if (!response.ok) {
             const errorText = await response.text();
@@ -354,19 +363,14 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
     if (!originalQuestion.trim() || !userAnswer.trim() || userAnswer.trim().length < 3) {
       return "I'd like to understand more about your approach. Could you give me a specific example from your experience?";
     }
-    
+
     try {
-      const response = await fetch("/.netlify/functions/followup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ originalQuestion, userAnswer })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Server returned ${response.status}`);
-      }
-      
-      const data = await response.json();
+      const data = await fetchJSONWithRetry(
+        "/.netlify/functions/followup",
+        { originalQuestion, userAnswer },
+        { maxRetries: 3 }
+      );
+
       return data.followUpQuestion || "Could you expand more on that answer with a concrete example?";
     } catch (error) {
       console.error("Error getting follow-up:", error);
@@ -377,13 +381,11 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
   // Get final classic and curveball questions
   const getFinalQuestionsFromClaude = async (): Promise<{ classic: string; curveball: string }> => {
     try {
-      const res = await fetch("/.netlify/functions/final-questions");
-      
-      if (!res.ok) {
-        throw new Error(`Server returned ${res.status}`);
-      }
-      
-      const data = await res.json();
+      const data = await fetchJSONWithRetry(
+        "/.netlify/functions/final-questions",
+        undefined, // No body for GET request
+        { maxRetries: 3 }
+      );
 
       if (!data.classic || !data.curveball) {
         throw new Error("Missing classic or curveball questions");

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { fetchJSONWithRetry } from "@/lib/fetch-retry";
 
 export default function FeedbackPage() {
   const router = useRouter();
@@ -64,17 +65,18 @@ export default function FeedbackPage() {
 
   const generateReport = async (interviewData: any) => {
     try {
-      const response = await fetch("/.netlify/functions/generate-report", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(interviewData)
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Server returned ${response.status}`);
-      }
-      
-      const reportData = await response.json();
+      const reportData = await fetchJSONWithRetry(
+        "/.netlify/functions/generate-report",
+        interviewData,
+        {
+          maxRetries: 3,
+          initialDelay: 1500, // Longer delay for report generation
+          onRetry: (attempt) => {
+            console.log(`Generating report... retry attempt ${attempt}`);
+          }
+        }
+      );
+
       setReport(reportData);
       setLoading(false);
     } catch (err) {
@@ -93,11 +95,34 @@ export default function FeedbackPage() {
         </div>
         <div className="max-w-3xl mx-auto">
           <div className="w-full bg-slate-800 p-8 rounded-lg shadow-md border border-slate-700">
-            <div className="flex justify-center items-center py-12">
-              <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-teal-500"></div>
+            <div className="flex justify-center items-center py-8 mb-6">
+              <div className="relative">
+                <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-teal-500"></div>
+                <div className="absolute inset-0 rounded-full border-t-2 border-b-2 border-cyan-500/30 animate-ping"></div>
+              </div>
             </div>
-            <p className="text-center text-slate-400">
-              Our AI coach is analyzing your responses and preparing detailed feedback...
+
+            <div className="space-y-4 mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 bg-teal-500 rounded-full animate-ping"></div>
+                <p className="text-slate-300">Analyzing your answers...</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 bg-cyan-500 rounded-full animate-pulse"></div>
+                <p className="text-slate-400">Identifying strengths and areas for improvement...</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 bg-teal-600 rounded-full animate-pulse delay-75"></div>
+                <p className="text-slate-400">Generating personalized recommendations...</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 bg-slate-600 rounded-full"></div>
+                <p className="text-slate-500">Preparing your detailed report...</p>
+              </div>
+            </div>
+
+            <p className="text-center text-teal-400 text-sm">
+              ⚡ Your feedback will be ready in ~5-10 seconds
             </p>
           </div>
         </div>

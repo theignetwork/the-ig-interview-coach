@@ -3,6 +3,7 @@
 import { Suspense, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { InterviewSession } from "@/components/interview/InterviewSession";
+import { fetchJSONWithRetry } from "@/lib/fetch-retry";
 
 // Client component that safely uses window
 function InterviewContent() {
@@ -38,20 +39,18 @@ function InterviewContent() {
       try {
         if (!loading) setLoading(true);
 
-        const res = await fetch("/.netlify/functions/generate-questions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ jobDescription }),
-        });
+        // Use retry logic for more reliable API calls
+        const data = await fetchJSONWithRetry(
+          "/.netlify/functions/generate-questions",
+          { jobDescription },
+          {
+            maxRetries: 3,
+            onRetry: (attempt, error) => {
+              console.log(`Retry attempt ${attempt}: ${error.message}`);
+            }
+          }
+        );
 
-        // Check if the response is valid
-        if (!res.ok) {
-          const errorText = await res.text();
-          console.error("API Error:", res.status, errorText);
-          throw new Error(`API returned ${res.status}: ${errorText}`);
-        }
-
-        const data = await res.json();
         console.log("Received questions data:", data);
 
         if (!data.questions || !Array.isArray(data.questions) || data.questions.length < 3) {
@@ -93,14 +92,27 @@ function InterviewContent() {
             Preparing Your Interview
           </h1>
           <div className="space-y-4">
-            <div className="w-full bg-slate-700 rounded-full h-2.5 mb-4">
-              <div
-                className="bg-teal-500 h-2.5 rounded-full animate-pulse"
+            <div className="w-full bg-slate-700 rounded-full h-2.5 mb-4 overflow-hidden">
+              <div className="bg-gradient-to-r from-teal-500 to-cyan-500 h-2.5 rounded-full animate-pulse shadow-lg shadow-teal-500/50"
                 style={{ width: "70%" }}
               ></div>
             </div>
-            <p className="text-center text-slate-300">
-              Analyzing job description and generating a tailored interview...
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 bg-teal-500 rounded-full animate-ping"></div>
+                <p className="text-slate-300">Analyzing job description...</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 bg-cyan-500 rounded-full animate-pulse"></div>
+                <p className="text-slate-400">Generating tailored questions...</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 bg-slate-600 rounded-full"></div>
+                <p className="text-slate-500">Preparing interview session...</p>
+              </div>
+            </div>
+            <p className="text-center text-teal-400 text-sm mt-4">
+              ⚡ Estimated time: ~5-10 seconds
             </p>
           </div>
         </div>

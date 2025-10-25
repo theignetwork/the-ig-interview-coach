@@ -1,5 +1,6 @@
 import { Handler } from '@netlify/functions';
 import { Anthropic } from "@anthropic-ai/sdk";
+import { getCachedQuestions, setCachedQuestions } from './utils/cache';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -23,7 +24,7 @@ export const handler: Handler = async (event) => {
   try {
     console.log("📥 Event received:", event.body);
     const { jobDescription } = JSON.parse(event.body || "{}");
-    
+
     if (!jobDescription || jobDescription.trim().length < 10) {
       console.log("❌ Missing or invalid job description");
       return {
@@ -31,7 +32,17 @@ export const handler: Handler = async (event) => {
         body: JSON.stringify({ error: "Missing or invalid job description" }),
       };
     }
-    
+
+    // Try to get cached questions first (24-hour cache)
+    const cachedQuestions = await getCachedQuestions(jobDescription);
+    if (cachedQuestions && cachedQuestions.length >= 3) {
+      console.log("⚡ Returning cached questions - instant response!");
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ questions: cachedQuestions, cached: true }),
+      };
+    }
+
     // Updated prompt to ask for 3 questions instead of 6
     const prompt = `You're a job interview expert.
 Based on the job description below, generate a tailored list of 3 thoughtful behavioral interview questions that assess problem-solving, communication, leadership, adaptability, and job-specific skills.
@@ -79,11 +90,17 @@ Questions:
       skill: "unspecified",
       difficulty: "medium",
     }));
-    
+
     console.log("✅ Parsed questions:", questions);
+
+    // Cache the questions for future requests (fire and forget)
+    setCachedQuestions(jobDescription, questions).catch(err =>
+      console.warn("Failed to cache questions:", err)
+    );
+
     return {
       statusCode: 200,
-      body: JSON.stringify({ questions } as QuestionResponse),
+      body: JSON.stringify({ questions, cached: false } as QuestionResponse),
     };
   } catch (err: any) {
     console.error("🔥 Claude handler error:", err?.message || err);
