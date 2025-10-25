@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { fetchJSONWithRetry } from "@/lib/fetch-retry";
+import { getInterviewById, saveFeedbackReport } from "@/lib/database/interview-service";
 
 export default function FeedbackPage() {
   const router = useRouter();
@@ -46,15 +47,42 @@ export default function FeedbackPage() {
 
   const loadInterviewData = async (sid: string) => {
     try {
-      const savedData = localStorage.getItem(`interview_${sid}`);
-      
-      if (!savedData) {
-        setError("Interview data not found. Please try again.");
+      // Fetch interview from database
+      const interview = await getInterviewById(sid);
+
+      if (!interview) {
+        setError("Interview not found. Please try again.");
         setLoading(false);
         return;
       }
-      
-      const interviewData = JSON.parse(savedData);
+
+      // Check if report already exists
+      if (interview.feedback_reports && interview.feedback_reports.length > 0) {
+        // Use existing report
+        setReport(interview.feedback_reports[0]);
+        setLoading(false);
+        console.log("Loaded existing report from database");
+        return;
+      }
+
+      // Build interview data structure for report generation
+      const questionsAndAnswers = interview.questions
+        .sort((a, b) => a.order_index - b.order_index)
+        .map((question) => {
+          const answer = interview.answers.find(a => a.question_id === question.id);
+          return {
+            question: question.text,
+            answer: answer?.content || ""
+          };
+        });
+
+      const interviewData = {
+        jobDescription: interview.job_data?.description || "No job description provided",
+        sessionId: sid,
+        timestamp: new Date(interview.created_at).getTime(),
+        questionsAndAnswers
+      };
+
       await generateReport(interviewData);
     } catch (err) {
       console.error("Error loading interview data:", err);
@@ -79,6 +107,22 @@ export default function FeedbackPage() {
 
       setReport(reportData);
       setLoading(false);
+
+      // Save report to database
+      try {
+        await saveFeedbackReport({
+          session_id: interviewData.sessionId,
+          overall_score: reportData.overall_score || 0,
+          summary: reportData.summary || "",
+          strengths: reportData.strengths || [],
+          areas_for_improvement: reportData.areas_for_improvement || [],
+          next_steps: reportData.next_steps || []
+        });
+        console.log("Saved feedback report to database");
+      } catch (dbError) {
+        console.error("Error saving report to database:", dbError);
+        // Don't fail the page if database save fails
+      }
     } catch (err) {
       console.error("Error generating report:", err);
       setError("Failed to generate interview feedback. Please try again.");

@@ -4,6 +4,7 @@ import { Suspense, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { InterviewSession } from "@/components/interview/InterviewSession";
 import { fetchJSONWithRetry } from "@/lib/fetch-retry";
+import { createInterviewSession, saveQuestions } from "@/lib/database/interview-service";
 
 // Client component that safely uses window
 function InterviewContent() {
@@ -61,9 +62,31 @@ function InterviewContent() {
         // Take the first 3 questions to ensure we have exactly what we need
         const parsedQuestions = data.questions.slice(0, 3);
 
+        // Create database session
+        const session = await createInterviewSession({
+          job_description: jobDescription,
+          job_title: "Custom Role",
+          company: "Company Name"
+        });
+
+        console.log("Created database session:", session.id);
+
+        // Save questions to database
+        await saveQuestions(
+          parsedQuestions.map((q: any, index: number) => ({
+            session_id: session.id,
+            text: q.text,
+            type: q.type || 'behavioral',
+            skill: q.skill || 'general',
+            difficulty: q.difficulty || 'medium',
+            order_index: index,
+            is_follow_up: false
+          }))
+        );
+
         const fakeJobData = {
-          jobTitle: "Custom Role",
-          company: "Company Name",
+          jobTitle: session.job_data.title,
+          company: session.job_data.company,
           requiredSkills: [],
           responsibilities: [],
           qualifications: [],
@@ -72,7 +95,7 @@ function InterviewContent() {
 
         setQuestions(parsedQuestions);
         setJobData(fakeJobData);
-        setSessionId(`session_${Date.now()}`);
+        setSessionId(session.id); // Use database session ID
         setLoading(false);
       } catch (error) {
         console.error("Error fetching questions:", error);

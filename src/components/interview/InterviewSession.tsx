@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Mic, MicOff } from "lucide-react";
 import { fetchJSONWithRetry, fetchWithRetry } from "@/lib/fetch-retry";
+import { saveAnswer, saveQuestion, completeInterviewSession, getInterviewById } from "@/lib/database/interview-service";
 
 interface InterviewSessionProps {
   questions: any[];
@@ -44,6 +45,7 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
   // State variables
   const [jobData, setJobData] = useState(initialJobData);
   const [questions, setQuestions] = useState<any[]>(initialQuestions.slice(0, 3)); // Only use the first 3 questions initially
+  const [dbQuestions, setDbQuestions] = useState<any[]>([]); // Database question objects with IDs
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<string[]>([]);
   const [currentAnswer, setCurrentAnswer] = useState("");
@@ -51,6 +53,7 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
   const [isFollowUp, setIsFollowUp] = useState(false);
   const [isLoadingFollowUp, setIsLoadingFollowUp] = useState(false);
   const [followUpQuestion, setFollowUpQuestion] = useState<string | null>(null);
+  const [followUpQuestionId, setFollowUpQuestionId] = useState<string | null>(null);
   const [finalsInjected, setFinalsInjected] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [audioRecorder, setAudioRecorder] = useState<any>(null);
@@ -68,7 +71,7 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
         setAudioRecorder(new AudioRecorder());
       }
     });
-    
+
     // Try to extract job info from the stored job description
     const jobDescription = localStorage.getItem("pastedJobDescription");
     if (jobDescription) {
@@ -79,7 +82,26 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
         company: jobInfo.company
       }));
     }
-  }, []);
+
+    // Fetch database questions for this session
+    async function loadDbQuestions() {
+      try {
+        const interview = await getInterviewById(sessionId);
+        if (interview && interview.questions) {
+          // Sort questions by order_index
+          const sortedQuestions = interview.questions.sort((a, b) => a.order_index - b.order_index);
+          setDbQuestions(sortedQuestions);
+          console.log("Loaded database questions:", sortedQuestions);
+        }
+      } catch (error) {
+        console.error("Error loading database questions:", error);
+        // Don't fail the interview if we can't load DB questions
+        // The interview can still proceed using the questions from props
+      }
+    }
+
+    loadDbQuestions();
+  }, [sessionId]);
 
   // Handle text input
   const handleAnswerChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -206,13 +228,44 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
       }
       return;
     }
-    
+
     setIsSubmitting(true);
     setRecordingError(null); // Clear any previous errors
 
     try {
       const updatedAnswers = [...answers, currentAnswer];
       setAnswers(updatedAnswers);
+
+      // Save answer to database
+      try {
+        let currentDbQuestion;
+
+        if (interviewStage === "main") {
+          // Find the main question by order_index
+          currentDbQuestion = dbQuestions.find((q) =>
+            !q.is_follow_up && q.order_index === currentQuestionIndex
+          );
+        } else {
+          // In final stage, find by type
+          if (currentQuestionIndex === 0) {
+            currentDbQuestion = dbQuestions.find((q) => q.type === 'traditional');
+          } else {
+            currentDbQuestion = dbQuestions.find((q) => q.type === 'curveball');
+          }
+        }
+
+        if (currentDbQuestion) {
+          await saveAnswer({
+            session_id: sessionId,
+            question_id: currentDbQuestion.id,
+            content: currentAnswer
+          });
+          console.log("Saved answer to database for question:", currentDbQuestion.id);
+        }
+      } catch (dbError) {
+        console.error("Error saving answer to database:", dbError);
+        // Don't fail the interview if database save fails
+      }
 
       // Only generate follow-ups during main questions and if not already in a follow-up
       if (interviewStage === "main" && !isFollowUp) {
@@ -223,6 +276,33 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
             currentAnswer
           );
           setFollowUpQuestion(followUp);
+
+          // Save follow-up question to database
+          try {
+            const parentQuestion = dbQuestions.find((q, idx) =>
+              !q.is_follow_up && q.order_index === currentQuestionIndex
+            );
+
+            if (parentQuestion) {
+              const savedFollowUp = await saveQuestion({
+                session_id: sessionId,
+                text: followUp,
+                type: 'behavioral',
+                skill: 'follow-up',
+                difficulty: 'medium',
+                order_index: dbQuestions.length, // Add at the end
+                is_follow_up: true,
+                parent_question_id: parentQuestion.id
+              });
+
+              setFollowUpQuestionId(savedFollowUp.id);
+              setDbQuestions([...dbQuestions, savedFollowUp]);
+              console.log("Saved follow-up question to database:", savedFollowUp.id);
+            }
+          } catch (dbError) {
+            console.error("Error saving follow-up question:", dbError);
+          }
+
           setIsFollowUp(true);
           setCurrentAnswer("");
         } catch (followUpError) {
@@ -246,12 +326,29 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
   };
 
   // Submit answer for follow-up questions
-  const handleSubmitFollowUp = () => {
+  const handleSubmitFollowUp = async () => {
     if (!currentAnswer.trim() || isSubmitting) return;
+
     const updatedAnswers = [...answers, currentAnswer];
     setAnswers(updatedAnswers);
+
+    // Save follow-up answer to database
+    if (followUpQuestionId) {
+      try {
+        await saveAnswer({
+          session_id: sessionId,
+          question_id: followUpQuestionId,
+          content: currentAnswer
+        });
+        console.log("Saved follow-up answer to database");
+      } catch (dbError) {
+        console.error("Error saving follow-up answer:", dbError);
+      }
+    }
+
     setIsFollowUp(false);
     setFollowUpQuestion(null);
+    setFollowUpQuestionId(null);
     setCurrentAnswer("");
     moveToNextQuestion();
   };
@@ -269,10 +366,42 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
         // Transition to the final questions stage
         try {
           const finalQs = await getFinalQuestionsFromClaude();
-          setQuestions([
+
+          const finalQuestions = [
             { text: finalQs.classic },
             { text: finalQs.curveball }
-          ]);
+          ];
+          setQuestions(finalQuestions);
+
+          // Save final questions to database
+          try {
+            const savedFinalQuestions = await Promise.all([
+              saveQuestion({
+                session_id: sessionId,
+                text: finalQs.classic,
+                type: 'traditional',
+                skill: 'general',
+                difficulty: 'medium',
+                order_index: dbQuestions.length,
+                is_follow_up: false
+              }),
+              saveQuestion({
+                session_id: sessionId,
+                text: finalQs.curveball,
+                type: 'curveball',
+                skill: 'general',
+                difficulty: 'hard',
+                order_index: dbQuestions.length + 1,
+                is_follow_up: false
+              })
+            ]);
+
+            setDbQuestions([...dbQuestions, ...savedFinalQuestions]);
+            console.log("Saved final questions to database");
+          } catch (dbError) {
+            console.error("Error saving final questions:", dbError);
+          }
+
           setInterviewStage("final");
           setCurrentQuestionIndex(0);
           setCurrentAnswer("");
@@ -297,60 +426,16 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
   };
 
   // Complete the interview
-  const handleInterviewComplete = () => {
-    // Save interview data to localStorage before navigating
+  const handleInterviewComplete = async () => {
+    // Mark session as completed in database
     try {
-      // Combine main questions and their follow-ups with final questions
-      const allQuestionsAndAnswers = [];
-      
-      // First, collect the main questions and their follow-ups
-      const mainQuestions = initialQuestions.slice(0, 3);
-      for (let i = 0; i < mainQuestions.length; i++) {
-        // Main question
-        allQuestionsAndAnswers.push({
-          question: mainQuestions[i].text,
-          answer: answers[i*2] || ""
-        });
-        
-        // Follow-up (if available in answers)
-        if (answers[i*2 + 1]) {
-          allQuestionsAndAnswers.push({
-            question: `Follow-up: Related to the previous question`,
-            answer: answers[i*2 + 1] || ""
-          });
-        }
-      }
-      
-      // Add final questions
-      if (answers.length > 6) {
-        // Classic question
-        allQuestionsAndAnswers.push({
-          question: questions[0].text, // Classic question in final stage
-          answer: answers[6] || ""
-        });
-      }
-      
-      if (answers.length > 7) {
-        // Curveball question
-        allQuestionsAndAnswers.push({
-          question: questions[1].text, // Curveball question in final stage
-          answer: answers[7] || ""
-        });
-      }
-      
-      const interviewData = {
-        jobDescription: localStorage.getItem("pastedJobDescription"),
-        sessionId: sessionId,
-        timestamp: Date.now(),
-        questionsAndAnswers: allQuestionsAndAnswers
-      };
-      
-      localStorage.setItem(`interview_${sessionId}`, JSON.stringify(interviewData));
-      console.log("Saved interview data to localStorage:", interviewData);
+      await completeInterviewSession(sessionId);
+      console.log("Marked interview session as complete:", sessionId);
     } catch (error) {
-      console.error("Error saving interview data:", error);
+      console.error("Error completing interview session:", error);
+      // Don't fail the navigation if DB update fails
     }
-    
+
     // Navigate to feedback page
     router.push(`/feedback?sessionId=${sessionId}`);
   };
