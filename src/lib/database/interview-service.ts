@@ -40,15 +40,20 @@ function getSupabase(): SupabaseClient {
 
 /**
  * Get or create a user identifier (since we don't have auth)
- * Uses a simple browser-based identifier
+ * Uses a UUID stored in browser localStorage
  */
 export function getUserId(): string | null {
   // In server/test environment, return null (user_id is nullable)
   if (typeof window === 'undefined') return null;
 
   let userId = localStorage.getItem('ig_user_id');
-  if (!userId) {
-    userId = `user_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+  // Validate if it's a proper UUID format (migrate old format)
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  if (!userId || !uuidRegex.test(userId)) {
+    // Generate a proper UUID v4
+    userId = crypto.randomUUID();
     localStorage.setItem('ig_user_id', userId);
   }
   return userId;
