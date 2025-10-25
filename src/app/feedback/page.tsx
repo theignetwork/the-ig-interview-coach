@@ -9,6 +9,7 @@ import { BarChart3 } from "lucide-react";
 export default function FeedbackPage() {
   const router = useRouter();
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [fromOraclePro, setFromOraclePro] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<any>(null);
@@ -31,11 +32,19 @@ export default function FeedbackPage() {
 
   useEffect(() => {
     if (!isLocalStorageAvailable) return;
-    
+
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const sid = params.get("sessionId");
-      
+
+      // Check if this session came from Oracle PRO
+      const oracleFlag = params.get('from_oracle');
+      const oracleSessionStorage = sessionStorage.getItem('oracle_pro_session');
+
+      if (oracleFlag === 'true' || oracleSessionStorage === 'true') {
+        setFromOraclePro(true);
+      }
+
       if (sid) {
         setSessionId(sid);
         loadInterviewData(sid);
@@ -427,6 +436,15 @@ export default function FeedbackPage() {
         <div className="text-center mt-12 mb-8">
           <p className="text-slate-400 mb-4">Powered by The IG Network</p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            {fromOraclePro && (
+              <a
+                href="https://igcareercoach.com/oracle-pro"
+                className="oracle-return-link"
+              >
+                <span className="link-icon">⚡</span>
+                <span>Back to Oracle PRO</span>
+              </a>
+            )}
             <button
               onClick={() => router.push("/dashboard")}
               className="inline-flex items-center gap-2 px-6 py-3 bg-slate-700 text-white rounded-md hover:bg-slate-600 transition-colors border border-slate-600"
