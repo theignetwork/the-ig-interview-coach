@@ -44,7 +44,7 @@ Do NOT mention that you are Claude or an AI. Strictly stay in character as a hum
 `;
     
     const response = await anthropic.messages.create({
-      model: "claude-3-opus-20240229",
+      model: "claude-3-5-haiku-20241022",
       max_tokens: 150,
       temperature: 0.7,
       messages: [{ role: "user", content: prompt }]

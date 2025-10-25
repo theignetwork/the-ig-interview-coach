@@ -43,7 +43,7 @@ Questions:
     
     console.log("🧠 Sending prompt to Claude...");
     const completion = await anthropic.messages.create({
-      model: "claude-3-opus-20240229",
+      model: "claude-3-5-haiku-20241022",
       max_tokens: 600,
       temperature: 0.7,
       messages: [{ role: "user", content: prompt }],

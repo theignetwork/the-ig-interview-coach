@@ -40,7 +40,7 @@ Only return the two questions as plain text, numbered like this:
 2. [curveball question]
 `;
     const completion = await anthropic.messages.create({
-      model: "claude-3-opus-20240229",
+      model: "claude-3-5-haiku-20241022",
       max_tokens: 300,
       temperature: 0.8,
       messages: [{ role: "user", content: prompt }]
