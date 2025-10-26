@@ -53,13 +53,87 @@ export default function DashboardPage() {
         getUserStats()
       ]);
 
-      setInterviews(interviewData);
-      setStats(statsData);
+      // Load Oracle sessions from localStorage
+      const oracleInterviews = loadOracleInterviews();
+
+      // Merge database interviews with Oracle interviews
+      const allInterviews = [...interviewData, ...oracleInterviews];
+
+      // Sort by created_at (most recent first)
+      allInterviews.sort((a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+      setInterviews(allInterviews);
+
+      // Update stats to include Oracle sessions
+      const updatedStats = {
+        ...statsData,
+        totalInterviews: allInterviews.length,
+        completedInterviews: allInterviews.filter(i => i.status === 'completed').length,
+        lastInterviewDate: allInterviews.length > 0 ? allInterviews[0].created_at : null
+      };
+
+      setStats(updatedStats);
       setLoading(false);
     } catch (err) {
       console.error("Error loading dashboard:", err);
       setError("Failed to load dashboard data. Please try again.");
       setLoading(false);
+    }
+  };
+
+  const loadOracleInterviews = (): InterviewWithDetails[] => {
+    try {
+      const oracleInterviews: InterviewWithDetails[] = [];
+
+      // Scan localStorage for oracle_interview_* keys
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('oracle_interview_')) {
+          const data = localStorage.getItem(key);
+          if (data) {
+            const oracleData = JSON.parse(data);
+
+            // Transform Oracle data to match InterviewWithDetails format
+            const interview: InterviewWithDetails = {
+              id: oracleData.sessionId,
+              created_at: new Date(oracleData.timestamp).toISOString(),
+              completed_at: new Date(oracleData.timestamp).toISOString(),
+              status: 'completed',
+              job_data: {
+                title: oracleData.jobDescription || 'Oracle PRO Interview',
+                company: '',
+                description: ''
+              },
+              questions: oracleData.questionsAndAnswers.map((qa: any, idx: number) => ({
+                id: `oracle_q_${idx}`,
+                text: qa.question,
+                order_index: idx,
+                type: 'oracle',
+                skill: 'oracle',
+                difficulty: 'medium',
+                is_follow_up: false
+              })),
+              answers: oracleData.questionsAndAnswers.map((qa: any, idx: number) => ({
+                id: `oracle_a_${idx}`,
+                question_id: `oracle_q_${idx}`,
+                content: qa.answer,
+                created_at: new Date(oracleData.timestamp).toISOString()
+              })),
+              feedback_reports: [] // Oracle sessions shown with feedback from localStorage
+            };
+
+            oracleInterviews.push(interview);
+          }
+        }
+      }
+
+      console.log(`📊 Loaded ${oracleInterviews.length} Oracle sessions from localStorage`);
+      return oracleInterviews;
+    } catch (error) {
+      console.error('Error loading Oracle interviews from localStorage:', error);
+      return [];
     }
   };
 
@@ -70,7 +144,16 @@ export default function DashboardPage() {
 
     try {
       setDeletingId(interviewId);
-      await deleteInterview(interviewId);
+
+      // Check if it's an Oracle session (stored in localStorage)
+      if (interviewId.startsWith('oracle_practice_')) {
+        // Delete from localStorage
+        localStorage.removeItem(`oracle_interview_${interviewId}`);
+        console.log('🗑️ Deleted Oracle session from localStorage:', interviewId);
+      } else {
+        // Delete from database
+        await deleteInterview(interviewId);
+      }
 
       // Reload data after deletion
       await loadDashboardData();
@@ -83,7 +166,12 @@ export default function DashboardPage() {
   };
 
   const handleViewReport = (interviewId: string) => {
-    router.push(`/feedback?sessionId=${interviewId}`);
+    // Add from_oracle flag for Oracle sessions
+    if (interviewId.startsWith('oracle_practice_')) {
+      router.push(`/feedback?sessionId=${interviewId}&from_oracle=true`);
+    } else {
+      router.push(`/feedback?sessionId=${interviewId}`);
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -328,6 +416,7 @@ export default function DashboardPage() {
                 const report = interview.feedback_reports[0];
                 const score = report?.overall_score || 0;
                 const hasReport = !!report;
+                const isOracleSession = interview.id.startsWith('oracle_practice_');
 
                 return (
                   <div
@@ -340,6 +429,11 @@ export default function DashboardPage() {
                           <h3 className="text-lg font-semibold text-white">
                             {interview.job_data?.title || "Interview"}
                           </h3>
+                          {isOracleSession && (
+                            <span className="px-2 py-1 bg-gradient-to-r from-teal-500 to-blue-500 text-white text-xs font-semibold rounded">
+                              ⚡ ORACLE PRO
+                            </span>
+                          )}
                           {interview.job_data?.company && (
                             <span className="text-slate-400">@</span>
                           )}
@@ -370,7 +464,7 @@ export default function DashboardPage() {
                       </div>
 
                       <div className="flex items-center gap-2">
-                        {hasReport ? (
+                        {hasReport || isOracleSession ? (
                           <button
                             onClick={() => handleViewReport(interview.id)}
                             className="px-4 py-2 bg-teal-500 text-white rounded-md hover:bg-teal-600 transition-colors text-sm font-medium"
