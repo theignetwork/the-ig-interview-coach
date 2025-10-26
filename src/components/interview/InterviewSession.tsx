@@ -127,13 +127,18 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
     setCurrentAnswer(e.target.value);
   };
 
-  // Calculate progress based on our 3+3+2 structure
+  // Calculate progress based on session type
   const calculateProgress = () => {
-    // Total steps: 3 main questions + 3 follow-ups + 2 final questions = 8 steps
+    // Oracle sessions: Simple progress through N questions
+    if (isOracleSession) {
+      return ((currentQuestionIndex + 1) / questions.length) * 100;
+    }
+
+    // Regular sessions: 3 main questions + 3 follow-ups + 2 final questions = 8 steps
     const totalSteps = 8;
-    
+
     let currentStep = 0;
-    
+
     if (interviewStage === "main") {
       // During main questions (0, 1, 2)
       if (isFollowUp) {
@@ -147,7 +152,7 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
       // Final questions (6, 7) - after all main Q+followups
       currentStep = 6 + currentQuestionIndex;
     }
-    
+
     return (currentStep / totalSteps) * 100;
   };
 
@@ -531,8 +536,10 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
       <div className="mb-6">
         <h2 className="text-xl font-bold mb-2">
           {isFollowUp ? "Follow-Up Question" : (
-            interviewStage === "main" 
-              ? `Question ${currentQuestionIndex + 1} of 3` 
+            interviewStage === "main"
+              ? (isOracleSession
+                  ? `Question ${currentQuestionIndex + 1} of ${questions.length}`
+                  : `Question ${currentQuestionIndex + 1} of 3`)
               : `${currentQuestionIndex === 0 ? "Traditional" : "Curveball"} Question`
           )}
         </h2>
