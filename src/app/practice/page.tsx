@@ -48,6 +48,12 @@ function PracticeContent() {
   useEffect(() => {
     if (!prepSessionId) return;
 
+    // Reset state when prep session ID changes
+    setQuestions([]);
+    setJobData(null);
+    setLoading(true);
+    setError(null);
+
     async function fetchPrepSession() {
       try {
         console.log('🔍 Fetching Oracle PRO prep session:', prepSessionId);
@@ -103,8 +109,10 @@ function PracticeContent() {
         setSessionId(`oracle_practice_${Date.now()}`);
         setOracleSessionId(prepSession.metadata?.oracle_session_id || null);
 
-        // Set flag for feedback page to know this came from Oracle PRO
+        // Clear any previous session data and set flag for Oracle PRO
+        sessionStorage.clear();
         sessionStorage.setItem('oracle_pro_session', 'true');
+        sessionStorage.setItem('prep_session_id', prepSessionId);
 
         setLoading(false);
 
@@ -195,6 +203,7 @@ function PracticeContent() {
 
         {questions.length > 0 && jobData && (
           <InterviewSession
+            key={prepSessionId} // Force remount when prep session changes
             questions={questions}
             jobData={jobData}
             sessionId={sessionId}
