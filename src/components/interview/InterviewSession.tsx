@@ -343,7 +343,8 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
           setIsLoadingFollowUp(false);
         }
       } else {
-        moveToNextQuestion();
+        // For Oracle sessions, pass the updated answers to moveToNextQuestion
+        moveToNextQuestion(isOracleSession ? updatedAnswers : undefined);
       }
     } catch (error) {
       console.error("Error submitting answer:", error);
@@ -382,7 +383,7 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
   };
 
   // Move to next question or stage
-  const moveToNextQuestion = async () => {
+  const moveToNextQuestion = async (allAnswers?: string[]) => {
     if (interviewStage === "main") {
       // For Oracle sessions, check against actual question count
       // For regular sessions, hardcode to 3 questions (index 2)
@@ -399,7 +400,7 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
         // Regular sessions: Transition to final questions stage
         if (isOracleSession) {
           console.log('✅ Oracle session complete - skipping final questions');
-          handleInterviewComplete();
+          handleInterviewComplete(allAnswers);
         } else {
           // Transition to the final questions stage (regular sessions only)
           try {
@@ -465,7 +466,7 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
   };
 
   // Complete the interview
-  const handleInterviewComplete = async () => {
+  const handleInterviewComplete = async (allAnswers?: string[]) => {
     // Mark session as completed in database (skip for Oracle sessions)
     if (!isOracleSession) {
       try {
@@ -478,9 +479,12 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
     } else {
       // For Oracle sessions, store Q&A in localStorage for feedback page
       try {
+        // Use passed allAnswers if provided, otherwise fall back to state
+        const answersToUse = allAnswers || answers;
+
         const questionsAndAnswers = questions.map((q, index) => ({
           question: q.text,
-          answer: answers[index] || ""
+          answer: answersToUse[index] || ""
         }));
 
         const oracleInterviewData = {
@@ -492,7 +496,11 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
         };
 
         localStorage.setItem(`oracle_interview_${sessionId}`, JSON.stringify(oracleInterviewData));
-        console.log('✅ Saved Oracle interview data to localStorage for feedback');
+        console.log('✅ Saved Oracle interview data to localStorage for feedback:', {
+          questionCount: questionsAndAnswers.length,
+          answersProvided: questionsAndAnswers.filter(qa => qa.answer).length,
+          data: oracleInterviewData
+        });
       } catch (error) {
         console.error('Error saving Oracle interview data:', error);
       }
