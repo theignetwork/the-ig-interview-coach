@@ -44,7 +44,11 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
 
   // State variables
   const [jobData, setJobData] = useState(initialJobData);
-  const [questions, setQuestions] = useState<any[]>(initialQuestions.slice(0, 3)); // Only use the first 3 questions initially
+  // For Oracle sessions, use ALL questions. For regular sessions, use first 3
+  const isOracleSession = initialJobData?.fromOracle === true;
+  const [questions, setQuestions] = useState<any[]>(
+    isOracleSession ? initialQuestions : initialQuestions.slice(0, 3)
+  );
   const [dbQuestions, setDbQuestions] = useState<any[]>([]); // Database question objects with IDs
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<string[]>([]);
@@ -83,8 +87,14 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
       }));
     }
 
-    // Fetch database questions for this session
+    // Fetch database questions for this session (skip for Oracle sessions)
     async function loadDbQuestions() {
+      // Skip database operations for Oracle sessions
+      if (isOracleSession) {
+        console.log('Oracle session detected - skipping database operations');
+        return;
+      }
+
       try {
         const interview = await getInterviewById(sessionId);
         if (interview && interview.questions) {
@@ -236,39 +246,42 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
       const updatedAnswers = [...answers, currentAnswer];
       setAnswers(updatedAnswers);
 
-      // Save answer to database
-      try {
-        let currentDbQuestion;
+      // Save answer to database (skip for Oracle sessions)
+      if (!isOracleSession) {
+        try {
+          let currentDbQuestion;
 
-        if (interviewStage === "main") {
-          // Find the main question by order_index
-          currentDbQuestion = dbQuestions.find((q) =>
-            !q.is_follow_up && q.order_index === currentQuestionIndex
-          );
-        } else {
-          // In final stage, find by type
-          if (currentQuestionIndex === 0) {
-            currentDbQuestion = dbQuestions.find((q) => q.type === 'traditional');
+          if (interviewStage === "main") {
+            // Find the main question by order_index
+            currentDbQuestion = dbQuestions.find((q) =>
+              !q.is_follow_up && q.order_index === currentQuestionIndex
+            );
           } else {
-            currentDbQuestion = dbQuestions.find((q) => q.type === 'curveball');
+            // In final stage, find by type
+            if (currentQuestionIndex === 0) {
+              currentDbQuestion = dbQuestions.find((q) => q.type === 'traditional');
+            } else {
+              currentDbQuestion = dbQuestions.find((q) => q.type === 'curveball');
+            }
           }
-        }
 
-        if (currentDbQuestion) {
-          await saveAnswer({
-            session_id: sessionId,
-            question_id: currentDbQuestion.id,
-            content: currentAnswer
-          });
-          console.log("Saved answer to database for question:", currentDbQuestion.id);
+          if (currentDbQuestion) {
+            await saveAnswer({
+              session_id: sessionId,
+              question_id: currentDbQuestion.id,
+              content: currentAnswer
+            });
+            console.log("Saved answer to database for question:", currentDbQuestion.id);
+          }
+        } catch (dbError) {
+          console.error("Error saving answer to database:", dbError);
+          // Don't fail the interview if database save fails
         }
-      } catch (dbError) {
-        console.error("Error saving answer to database:", dbError);
-        // Don't fail the interview if database save fails
       }
 
       // Only generate follow-ups during main questions and if not already in a follow-up
-      if (interviewStage === "main" && !isFollowUp) {
+      // Skip follow-ups for Oracle sessions
+      if (interviewStage === "main" && !isFollowUp && !isOracleSession) {
         setIsLoadingFollowUp(true);
         try {
           const followUp = await getFollowUpFromClaude(
@@ -332,8 +345,8 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
     const updatedAnswers = [...answers, currentAnswer];
     setAnswers(updatedAnswers);
 
-    // Save follow-up answer to database
-    if (followUpQuestionId) {
+    // Save follow-up answer to database (skip for Oracle sessions)
+    if (followUpQuestionId && !isOracleSession) {
       try {
         await saveAnswer({
           session_id: sessionId,
@@ -427,13 +440,15 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
 
   // Complete the interview
   const handleInterviewComplete = async () => {
-    // Mark session as completed in database
-    try {
-      await completeInterviewSession(sessionId);
-      console.log("Marked interview session as complete:", sessionId);
-    } catch (error) {
-      console.error("Error completing interview session:", error);
-      // Don't fail the navigation if DB update fails
+    // Mark session as completed in database (skip for Oracle sessions)
+    if (!isOracleSession) {
+      try {
+        await completeInterviewSession(sessionId);
+        console.log("Marked interview session as complete:", sessionId);
+      } catch (error) {
+        console.error("Error completing interview session:", error);
+        // Don't fail the navigation if DB update fails
+      }
     }
 
     // Navigate to feedback page
