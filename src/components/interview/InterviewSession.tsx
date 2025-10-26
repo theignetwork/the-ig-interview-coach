@@ -379,64 +379,75 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
   // Move to next question or stage
   const moveToNextQuestion = async () => {
     if (interviewStage === "main") {
-      const isLastMainQuestion = currentQuestionIndex === 2;
-      
+      // For Oracle sessions, check against actual question count
+      // For regular sessions, hardcode to 3 questions (index 2)
+      const isLastMainQuestion = isOracleSession
+        ? currentQuestionIndex === questions.length - 1
+        : currentQuestionIndex === 2;
+
       if (!isLastMainQuestion) {
         // Move to the next main question
         setCurrentQuestionIndex(currentQuestionIndex + 1);
         setCurrentAnswer("");
       } else {
-        // Transition to the final questions stage
-        try {
-          const finalQs = await getFinalQuestionsFromClaude();
-
-          const finalQuestions = [
-            { text: finalQs.classic },
-            { text: finalQs.curveball }
-          ];
-          setQuestions(finalQuestions);
-
-          // Save final questions to database
-          try {
-            const savedFinalQuestions = await Promise.all([
-              saveQuestion({
-                session_id: sessionId,
-                text: finalQs.classic,
-                type: 'traditional',
-                skill: 'general',
-                difficulty: 'medium',
-                order_index: dbQuestions.length,
-                is_follow_up: false
-              }),
-              saveQuestion({
-                session_id: sessionId,
-                text: finalQs.curveball,
-                type: 'curveball',
-                skill: 'general',
-                difficulty: 'hard',
-                order_index: dbQuestions.length + 1,
-                is_follow_up: false
-              })
-            ]);
-
-            setDbQuestions([...dbQuestions, ...savedFinalQuestions]);
-            console.log("Saved final questions to database");
-          } catch (dbError) {
-            console.error("Error saving final questions:", dbError);
-          }
-
-          setInterviewStage("final");
-          setCurrentQuestionIndex(0);
-          setCurrentAnswer("");
-        } catch (error) {
-          console.error("Failed to fetch final Claude questions", error);
+        // Oracle sessions: Complete interview without final questions
+        // Regular sessions: Transition to final questions stage
+        if (isOracleSession) {
+          console.log('✅ Oracle session complete - skipping final questions');
           handleInterviewComplete();
+        } else {
+          // Transition to the final questions stage (regular sessions only)
+          try {
+            const finalQs = await getFinalQuestionsFromClaude();
+
+            const finalQuestions = [
+              { text: finalQs.classic },
+              { text: finalQs.curveball }
+            ];
+            setQuestions(finalQuestions);
+
+            // Save final questions to database
+            try {
+              const savedFinalQuestions = await Promise.all([
+                saveQuestion({
+                  session_id: sessionId,
+                  text: finalQs.classic,
+                  type: 'traditional',
+                  skill: 'general',
+                  difficulty: 'medium',
+                  order_index: dbQuestions.length,
+                  is_follow_up: false
+                }),
+                saveQuestion({
+                  session_id: sessionId,
+                  text: finalQs.curveball,
+                  type: 'curveball',
+                  skill: 'general',
+                  difficulty: 'hard',
+                  order_index: dbQuestions.length + 1,
+                  is_follow_up: false
+                })
+              ]);
+
+              setDbQuestions([...dbQuestions, ...savedFinalQuestions]);
+              console.log("Saved final questions to database");
+            } catch (dbError) {
+              console.error("Error saving final questions:", dbError);
+            }
+
+            setInterviewStage("final");
+            setCurrentQuestionIndex(0);
+            setCurrentAnswer("");
+          } catch (error) {
+            console.error("Failed to fetch final Claude questions", error);
+            handleInterviewComplete();
+          }
         }
       }
     } else {
       // In final stage
       const isLastFinalQuestion = currentQuestionIndex === 1;
-      
+
       if (!isLastFinalQuestion) {
         // Move to the next final question
         setCurrentQuestionIndex(currentQuestionIndex + 1);
