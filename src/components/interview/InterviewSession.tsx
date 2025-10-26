@@ -46,6 +46,15 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
   const [jobData, setJobData] = useState(initialJobData);
   // For Oracle sessions, use ALL questions. For regular sessions, use first 3
   const isOracleSession = initialJobData?.fromOracle === true;
+
+  // Debug logging
+  console.log('🔍 InterviewSession initialized:', {
+    isOracleSession,
+    fromOracle: initialJobData?.fromOracle,
+    questionCount: initialQuestions.length,
+    sessionId
+  });
+
   const [questions, setQuestions] = useState<any[]>(
     isOracleSession ? initialQuestions : initialQuestions.slice(0, 3)
   );
@@ -282,6 +291,7 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
       // Only generate follow-ups during main questions and if not already in a follow-up
       // Skip follow-ups for Oracle sessions
       if (interviewStage === "main" && !isFollowUp && !isOracleSession) {
+        console.log('✅ Generating follow-up question (regular session)');
         setIsLoadingFollowUp(true);
         try {
           const followUp = await getFollowUpFromClaude(
