@@ -475,10 +475,35 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
         console.error("Error completing interview session:", error);
         // Don't fail the navigation if DB update fails
       }
+    } else {
+      // For Oracle sessions, store Q&A in localStorage for feedback page
+      try {
+        const questionsAndAnswers = questions.map((q, index) => ({
+          question: q.text,
+          answer: answers[index] || ""
+        }));
+
+        const oracleInterviewData = {
+          sessionId,
+          jobDescription: jobData?.jobTitle ? `${jobData.jobTitle} at ${jobData.company}` : "Interview Session",
+          timestamp: Date.now(),
+          questionsAndAnswers,
+          fromOracle: true
+        };
+
+        localStorage.setItem(`oracle_interview_${sessionId}`, JSON.stringify(oracleInterviewData));
+        console.log('✅ Saved Oracle interview data to localStorage for feedback');
+      } catch (error) {
+        console.error('Error saving Oracle interview data:', error);
+      }
     }
 
     // Navigate to feedback page
-    router.push(`/feedback?sessionId=${sessionId}`);
+    const feedbackUrl = isOracleSession
+      ? `/feedback?sessionId=${sessionId}&from_oracle=true`
+      : `/feedback?sessionId=${sessionId}`;
+
+    router.push(feedbackUrl);
   };
 
   // Calculate progress percentage

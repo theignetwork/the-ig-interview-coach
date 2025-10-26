@@ -57,7 +57,34 @@ export default function FeedbackPage() {
 
   const loadInterviewData = async (sid: string) => {
     try {
-      // Fetch interview from database
+      // Check if this is an Oracle session
+      const params = new URLSearchParams(window.location.search);
+      const oracleFlag = params.get('from_oracle');
+      const oracleSessionStorage = sessionStorage.getItem('oracle_pro_session');
+      const isOracleSession = oracleFlag === 'true' || oracleSessionStorage === 'true';
+
+      // For Oracle sessions, load from localStorage instead of database
+      if (isOracleSession) {
+        console.log('📊 Loading Oracle session data from localStorage');
+
+        const localStorageKey = `oracle_interview_${sid}`;
+        const storedData = localStorage.getItem(localStorageKey);
+
+        if (!storedData) {
+          setError("Oracle interview data not found. The session may have expired.");
+          setLoading(false);
+          return;
+        }
+
+        const oracleData = JSON.parse(storedData);
+        console.log('✅ Loaded Oracle interview data:', oracleData);
+
+        // Generate report directly from localStorage data
+        await generateReport(oracleData);
+        return;
+      }
+
+      // Regular sessions: Fetch interview from database
       const interview = await getInterviewById(sid);
 
       if (!interview) {
