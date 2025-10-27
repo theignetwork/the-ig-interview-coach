@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BarChart3, Sparkles, X } from "lucide-react";
 import { jwtVerify } from "jose";
 
-export default function Home() {
+// Component that uses useSearchParams (must be wrapped in Suspense)
+function HomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [jobText, setJobText] = useState("");
@@ -192,6 +193,17 @@ export default function Home() {
   );
 }
 
-
-
-
+// Main component with Suspense wrapper
+export default function Home() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-3xl mx-auto text-center">
+          <div className="text-white">Loading...</div>
+        </div>
+      </main>
+    }>
+      <HomeContent />
+    </Suspense>
+  );
+}
