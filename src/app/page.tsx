@@ -1,14 +1,83 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { BarChart3 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { BarChart3, Sparkles, X } from "lucide-react";
+import { jwtVerify } from "jose";
 
 export default function Home() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [jobText, setJobText] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [smartContextLoaded, setSmartContextLoaded] = useState(false);
+  const [contextData, setContextData] = useState<any>(null);
+
+  // Detect and decode smart context from URL
+  useEffect(() => {
+    const loadContext = async () => {
+      console.log('[Smart Context] Checking for context parameter...');
+      const token = searchParams.get('context');
+      console.log('[Smart Context] Token from URL:', token ? `${token.substring(0, 50)}...` : 'NOT FOUND');
+
+      if (token) {
+        try {
+          console.log('[Smart Context] Attempting to decode JWT...');
+          const secret = process.env.NEXT_PUBLIC_JWT_SECRET || 'your-secret-key-here';
+          console.log('[Smart Context] Using secret:', secret);
+
+          // Decode JWT token using jose (browser-compatible)
+          const secretKey = new TextEncoder().encode(secret);
+          const { payload } = await jwtVerify(token, secretKey);
+          console.log('[Smart Context] Decoded payload:', payload);
+
+          // Build job description from context
+          const jobDescription = buildJobDescription(payload);
+          console.log('[Smart Context] Built job description:', jobDescription.substring(0, 100));
+
+          // Auto-fill the textarea
+          setJobText(jobDescription);
+          setContextData(payload);
+          setSmartContextLoaded(true);
+
+          // Clean URL (optional)
+          window.history.replaceState({}, '', window.location.pathname);
+          console.log('[Smart Context] SUCCESS - Context loaded!');
+        } catch (err) {
+          console.error('[Smart Context] Failed to decode context token:', err);
+          // Don't show error to user - just fail silently
+        }
+      } else {
+        console.log('[Smart Context] No context parameter found in URL');
+      }
+    };
+
+    loadContext();
+  }, [searchParams]);
+
+  // Helper to build job description from context data
+  const buildJobDescription = (data: any): string => {
+    let desc = '';
+
+    if (data.companyName || data.positionTitle) {
+      desc += `Company: ${data.companyName || 'Not specified'}\n`;
+      desc += `Position: ${data.positionTitle || 'Not specified'}\n\n`;
+    }
+
+    if (data.location) desc += `Location: ${data.location}\n`;
+    if (data.remoteType) desc += `Work Type: ${data.remoteType}\n`;
+    if (data.salaryRange) desc += `Salary: ${data.salaryRange}\n`;
+    if (data.location || data.remoteType || data.salaryRange) desc += '\n';
+
+    if (data.jobDescription) {
+      desc += `Job Description:\n${data.jobDescription}`;
+    } else {
+      desc += 'Job Description:\n(Details auto-loaded from Career Hub - please add more information if available)';
+    }
+
+    return desc;
+  };
 
   const handleSubmit = async () => {
     try {
@@ -42,6 +111,31 @@ export default function Home() {
             Practice your interview skills with AI-generated questions based on real job descriptions
           </p>
         </div>
+
+        {/* Smart Context Banner */}
+        {smartContextLoaded && (
+          <div className="mb-6 bg-gradient-to-r from-teal-500/20 to-cyan-500/20 border-2 border-teal-500/50 rounded-lg p-4 relative animate-fade-in">
+            <button
+              onClick={() => setSmartContextLoaded(false)}
+              className="absolute top-2 right-2 text-teal-200 hover:text-white transition-colors"
+            >
+              <X size={20} />
+            </button>
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5">
+                <Sparkles className="text-teal-400" size={24} />
+              </div>
+              <div>
+                <h3 className="text-white font-bold text-lg mb-1">
+                  ✨ Job Details Auto-Loaded!
+                </h3>
+                <p className="text-teal-100 text-sm">
+                  Context from <span className="font-semibold">{contextData?.companyName}</span> - {contextData?.positionTitle} has been automatically filled. You can edit the details below before starting your interview practice.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="bg-slate-800 p-8 rounded-lg shadow-md border border-slate-700">
           <h2 className="text-2xl font-bold text-white mb-6">
