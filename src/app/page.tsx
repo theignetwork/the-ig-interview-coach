@@ -15,35 +15,11 @@ function HomeContent() {
   const [smartContextLoaded, setSmartContextLoaded] = useState(false);
   const [contextData, setContextData] = useState<any>(null);
 
-  // Detect and decode smart context from URL hash fragment (or query param fallback)
+  // Detect and decode smart context from URL
   useEffect(() => {
     const loadContext = async () => {
       console.log('[Smart Context] Checking for context parameter...');
-
-      // Read from hash fragment - try parent window first (if in iframe)
-      let hash = '';
-      try {
-        if (window.parent && window.parent !== window) {
-          hash = window.parent.location.hash.substring(1);
-        }
-      } catch (e) {
-        console.log('[Smart Context] Cannot access parent window (cross-origin)');
-      }
-
-      // Fallback to current window hash
-      if (!hash) {
-        hash = window.location.hash.substring(1);
-      }
-
-      const hashParams = new URLSearchParams(hash);
-      let token = hashParams.get('context');
-
-      // Fallback to query parameter for backwards compatibility
-      if (!token) {
-        const urlParams = new URLSearchParams(window.location.search);
-        token = urlParams.get('context');
-      }
-
+      const token = searchParams.get('context');
       console.log('[Smart Context] Token from URL:', token ? `${token.substring(0, 50)}...` : 'NOT FOUND');
 
       if (token) {
@@ -79,7 +55,7 @@ function HomeContent() {
     };
 
     loadContext();
-  }, []); // Run once on mount to check hash fragment
+  }, [searchParams]);
 
   // Helper to build job description from context data
   const buildJobDescription = (data: any): string => {
