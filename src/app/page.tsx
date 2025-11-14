@@ -19,8 +19,22 @@ function HomeContent() {
   useEffect(() => {
     const loadContext = async () => {
       console.log('[Smart Context] Checking for context parameter...');
-      // Read from hash fragment first
-      const hash = window.location.hash.substring(1); // Remove the '#'
+
+      // Read from hash fragment - try parent window first (if in iframe)
+      let hash = '';
+      try {
+        if (window.parent && window.parent !== window) {
+          hash = window.parent.location.hash.substring(1);
+        }
+      } catch (e) {
+        console.log('[Smart Context] Cannot access parent window (cross-origin)');
+      }
+
+      // Fallback to current window hash
+      if (!hash) {
+        hash = window.location.hash.substring(1);
+      }
+
       const hashParams = new URLSearchParams(hash);
       let token = hashParams.get('context');
 
