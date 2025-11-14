@@ -15,14 +15,21 @@ function HomeContent() {
   const [smartContextLoaded, setSmartContextLoaded] = useState(false);
   const [contextData, setContextData] = useState<any>(null);
 
-  // Detect and decode smart context from URL hash fragment
+  // Detect and decode smart context from URL hash fragment (or query param fallback)
   useEffect(() => {
     const loadContext = async () => {
       console.log('[Smart Context] Checking for context parameter...');
-      // Read from hash fragment instead of query params
+      // Read from hash fragment first
       const hash = window.location.hash.substring(1); // Remove the '#'
       const hashParams = new URLSearchParams(hash);
-      const token = hashParams.get('context');
+      let token = hashParams.get('context');
+
+      // Fallback to query parameter for backwards compatibility
+      if (!token) {
+        const urlParams = new URLSearchParams(window.location.search);
+        token = urlParams.get('context');
+      }
+
       console.log('[Smart Context] Token from URL:', token ? `${token.substring(0, 50)}...` : 'NOT FOUND');
 
       if (token) {
