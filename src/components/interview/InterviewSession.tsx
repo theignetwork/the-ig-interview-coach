@@ -475,6 +475,12 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
           try {
             const finalQs = await getFinalQuestionsFromClaude();
 
+            // Defensive check - ensure we have valid questions
+            if (!finalQs.classic || !finalQs.curveball) {
+              console.error('[Interview] Invalid final questions received:', finalQs);
+              throw new Error('Invalid final questions');
+            }
+
             const finalQuestions = [
               { text: finalQs.classic },
               { text: finalQs.curveball }
