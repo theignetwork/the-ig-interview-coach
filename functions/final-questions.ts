@@ -15,6 +15,7 @@ interface ErrorResponse {
 }
 
 const handler: Handler = async (event, context) => {
+  console.log('[Final Questions] Function invoked');
   try {
     console.log('[Final Questions] Generating final interview questions...');
     const prompt = `
@@ -86,10 +87,16 @@ Only return the two questions as plain text, numbered like this:
       } as FinalQuestionsResponse)
     };
   } catch (error) {
-    console.error("Claude error:", error);
+    console.error("[Final Questions] Claude error:", error);
+    console.error("[Final Questions] Error details:", JSON.stringify(error, null, 2));
+
+    // Return fallback questions instead of error
     return {
-      statusCode: 500,
-      body: JSON.stringify({ error: "Failed to generate final questions." } as ErrorResponse)
+      statusCode: 200,
+      body: JSON.stringify({
+        classic: "What would you say are your greatest strengths, and how do they align with this role?",
+        curveball: "What's a commonly held belief in your professional field that you think might be wrong, and why?"
+      } as FinalQuestionsResponse)
     };
   }
 };
