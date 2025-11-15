@@ -59,7 +59,7 @@ Only return the two questions as plain text, numbered like this:
     console.log('[Final Questions] Calling Anthropic API...');
     const completion = await anthropic.messages.create({
       model: "claude-3-5-haiku-20241022",
-      max_tokens: 300,
+      max_tokens: 500, // Increased from 300 to ensure full response
       temperature: 0.8,
       messages: [{ role: "user", content: prompt }]
     });
@@ -94,7 +94,7 @@ Only return the two questions as plain text, numbered like this:
     if (!matches || matches.length < 3) {
       console.log("[Final Questions] Failed to parse questions from Claude response");
       console.log("[Final Questions] Text was:", text);
-      
+
       // Provide better fallback questions
       return {
         statusCode: 200,
@@ -104,12 +104,31 @@ Only return the two questions as plain text, numbered like this:
         } as FinalQuestionsResponse)
       };
     }
-    
+
+    const classic = matches[1].trim();
+    const curveball = matches[2].trim();
+
+    // Validate both questions are present and meaningful
+    if (!classic || classic.length < 10 || !curveball || curveball.length < 10) {
+      console.log("[Final Questions] Questions too short or missing");
+      console.log("[Final Questions] Classic:", classic);
+      console.log("[Final Questions] Curveball:", curveball);
+
+      return {
+        statusCode: 200,
+        body: JSON.stringify({
+          classic: "What would you say are your greatest strengths, and how do they align with this role?",
+          curveball: "What's a commonly held belief in your professional field that you think might be wrong, and why?"
+        } as FinalQuestionsResponse)
+      };
+    }
+
+    console.log("[Final Questions] Successfully parsed both questions");
     return {
       statusCode: 200,
       body: JSON.stringify({
-        classic: matches[1].trim(),
-        curveball: matches[2].trim()
+        classic,
+        curveball
       } as FinalQuestionsResponse)
     };
   } catch (error) {
