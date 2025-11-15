@@ -49,7 +49,18 @@ Do NOT mention that you are Claude or an AI. Strictly stay in character as a hum
       temperature: 0.7,
       messages: [{ role: "user", content: prompt }]
     });
-    
+
+    // Defensive check for response structure
+    if (!response.content || !response.content[0] || !response.content[0].text) {
+      console.error("Unexpected API response structure:", JSON.stringify(response));
+      return {
+        statusCode: 200,
+        body: JSON.stringify({
+          followUpQuestion: "Can you elaborate on that point a bit more?"
+        })
+      };
+    }
+
     let followUpQuestion = response.content[0].text.trim();
     
     // Clean up response to ensure it's just a question

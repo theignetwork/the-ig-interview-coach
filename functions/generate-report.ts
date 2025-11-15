@@ -75,11 +75,17 @@ Return your analysis in this JSON format:
     });
     
     console.log("Received response from Anthropic API");
-    
+
+    // Defensive check for response structure
+    if (!response.content || !response.content[0] || !response.content[0].text) {
+      console.error("Unexpected API response structure:", JSON.stringify(response));
+      throw new Error("Invalid response from AI - missing content");
+    }
+
     // Extract JSON from Claude's response
     const text = response.content[0].text;
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    
+
     if (!jsonMatch) {
       throw new Error("Failed to parse JSON from Claude's response");
     }
