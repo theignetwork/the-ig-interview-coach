@@ -382,6 +382,75 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
     moveToNextQuestion();
   };
 
+  // Skip current question
+  const handleSkipQuestion = async () => {
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+    setRecordingError(null);
+
+    try {
+      // Add "[Skipped]" as the answer so report can identify it
+      const skippedAnswer = "[Skipped]";
+      const updatedAnswers = [...answers, skippedAnswer];
+      setAnswers(updatedAnswers);
+
+      // Save skipped answer to database (skip for Oracle sessions)
+      if (!isOracleSession) {
+        try {
+          let currentDbQuestion;
+
+          if (interviewStage === "main" && !isFollowUp) {
+            // Find the main question by order_index
+            currentDbQuestion = dbQuestions.find((q) =>
+              !q.is_follow_up && q.order_index === currentQuestionIndex
+            );
+          } else if (isFollowUp && followUpQuestionId) {
+            // For follow-up questions, we already have the ID
+            currentDbQuestion = dbQuestions.find((q) => q.id === followUpQuestionId);
+          } else if (interviewStage === "final") {
+            // In final stage, find by type
+            if (currentQuestionIndex === 0) {
+              currentDbQuestion = dbQuestions.find((q) => q.type === 'traditional');
+            } else {
+              currentDbQuestion = dbQuestions.find((q) => q.type === 'curveball');
+            }
+          }
+
+          if (currentDbQuestion) {
+            await saveAnswer({
+              session_id: sessionId,
+              question_id: currentDbQuestion.id,
+              content: skippedAnswer
+            });
+            console.log("Saved skipped answer to database for question:", currentDbQuestion.id);
+          }
+        } catch (dbError) {
+          console.error("Error saving skipped answer to database:", dbError);
+          // Don't fail the interview if database save fails
+        }
+      }
+
+      // If this is a follow-up question, handle it differently
+      if (isFollowUp) {
+        setIsFollowUp(false);
+        setFollowUpQuestion(null);
+        setFollowUpQuestionId(null);
+        setCurrentAnswer("");
+        moveToNextQuestion();
+      } else {
+        // For main questions, skip the follow-up generation and move on
+        // For Oracle sessions, pass the updated answers to moveToNextQuestion
+        moveToNextQuestion(isOracleSession ? updatedAnswers : undefined);
+      }
+    } catch (error) {
+      console.error("Error skipping question:", error);
+      moveToNextQuestion();
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // Move to next question or stage
   const moveToNextQuestion = async (allAnswers?: string[]) => {
     if (interviewStage === "main") {
@@ -598,13 +667,24 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
       )}
 
       <div className="flex items-center justify-between mb-4">
-        <button
-          onClick={isFollowUp ? handleSubmitFollowUp : handleSubmitAnswer}
-          disabled={!currentAnswer.trim() || isSubmitting}
-          className="bg-teal-500 hover:bg-teal-600 text-white font-semibold py-2 px-6 rounded disabled:opacity-50"
-        >
-          {isSubmitting ? "Submitting..." : isFollowUp ? "Submit Follow-Up" : "Submit Answer"}
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={isFollowUp ? handleSubmitFollowUp : handleSubmitAnswer}
+            disabled={!currentAnswer.trim() || isSubmitting}
+            className="bg-teal-500 hover:bg-teal-600 text-white font-semibold py-2 px-6 rounded disabled:opacity-50"
+          >
+            {isSubmitting ? "Submitting..." : isFollowUp ? "Submit Follow-Up" : "Submit Answer"}
+          </button>
+
+          <button
+            onClick={handleSkipQuestion}
+            disabled={isSubmitting}
+            className="bg-slate-600 hover:bg-slate-700 text-white font-semibold py-2 px-6 rounded disabled:opacity-50"
+            title="Skip this question"
+          >
+            Skip Question
+          </button>
+        </div>
 
         {audioRecorder && (
           <button

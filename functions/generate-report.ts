@@ -21,10 +21,21 @@ export const handler: Handler = async (event) => {
     }
     
     // Create a more compact interview summary
-    const interviewSummary = questionsAndAnswers.map(qa => 
-      `Q: ${qa.question.substring(0, 150)}\nA: ${(qa.answer || "No answer").substring(0, 200)}`
-    ).join("\n\n");
-    
+    const interviewSummary = questionsAndAnswers.map(qa => {
+      let answerText = qa.answer || "No answer";
+
+      // Handle skipped questions
+      if (answerText === "[Skipped]") {
+        answerText = "[Candidate skipped this question]";
+      }
+
+      return `Q: ${qa.question.substring(0, 150)}\nA: ${answerText.substring(0, 200)}`;
+    }).join("\n\n");
+
+    // Count how many questions were answered vs skipped
+    const answeredCount = questionsAndAnswers.filter(qa => qa.answer && qa.answer !== "[Skipped]").length;
+    const skippedCount = questionsAndAnswers.filter(qa => !qa.answer || qa.answer === "[Skipped]").length;
+
     // Create the improved prompt
     const prompt = `
 As an expert interview coach, analyze this mock interview and provide detailed, actionable feedback.
@@ -35,6 +46,8 @@ ${jobDescription ? jobDescription.substring(0, 500) + (jobDescription.length > 5
 Interview Transcript:
 ${interviewSummary}
 
+Note: The candidate answered ${answeredCount} question(s) and skipped ${skippedCount} question(s).
+
 Provide a personalized analysis that will help the candidate improve. Be specific, varied, and actionable in your feedback.
 
 When writing feedback:
@@ -42,7 +55,8 @@ When writing feedback:
 2. Include specific action items for each area of improvement
 3. Explain briefly why each improvement matters for this specific job role
 4. Suggest 1-2 specific follow-up practice questions for areas that need improvement
-5. End with a brief personalized note of encouragement
+5. If questions were skipped, mention that answering all questions helps provide better practice
+6. End with a brief personalized note of encouragement
 
 Return your analysis in this JSON format:
 {
