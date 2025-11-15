@@ -16,8 +16,22 @@ interface ErrorResponse {
 
 const handler: Handler = async (event, context) => {
   console.log('[Final Questions] Function invoked');
+
+  // Check if API key is configured
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.error('[Final Questions] ANTHROPIC_API_KEY is not set!');
+    return {
+      statusCode: 200,
+      body: JSON.stringify({
+        classic: "What would you say are your greatest strengths, and how do they align with this role?",
+        curveball: "What's a commonly held belief in your professional field that you think might be wrong, and why?"
+      } as FinalQuestionsResponse)
+    };
+  }
+
   try {
     console.log('[Final Questions] Generating final interview questions...');
+    console.log('[Final Questions] API Key present:', process.env.ANTHROPIC_API_KEY ? 'YES' : 'NO');
     const prompt = `
 You're a job interview expert generating the final two questions for an interview.
 
@@ -41,6 +55,8 @@ Only return the two questions as plain text, numbered like this:
 1. [classic question]
 2. [curveball question]
 `;
+
+    console.log('[Final Questions] Calling Anthropic API...');
     const completion = await anthropic.messages.create({
       model: "claude-3-5-haiku-20241022",
       max_tokens: 300,
@@ -48,9 +64,15 @@ Only return the two questions as plain text, numbered like this:
       messages: [{ role: "user", content: prompt }]
     });
 
+    console.log('[Final Questions] API Response received');
+    console.log('[Final Questions] Response type:', typeof completion);
+    console.log('[Final Questions] Has content:', !!completion.content);
+    console.log('[Final Questions] Content length:', completion.content?.length);
+
     // Defensive check for response structure
     if (!completion.content || !completion.content[0] || !completion.content[0].text) {
-      console.error("Unexpected API response structure:", JSON.stringify(completion));
+      console.error("[Final Questions] Unexpected API response structure!");
+      console.error("[Final Questions] Full response:", JSON.stringify(completion, null, 2));
       return {
         statusCode: 200,
         body: JSON.stringify({
@@ -61,7 +83,7 @@ Only return the two questions as plain text, numbered like this:
     }
 
     const text = completion.content[0].text.trim();
-    console.log("Claude response for final questions:", text);
+    console.log("[Final Questions] Successfully extracted text, length:", text.length);
     
     // Extract the two questions using regex
     const matches = text.match(/1\.\s*(.+)\s*2\.\s*(.+)/s);
