@@ -74,7 +74,9 @@ export function InterviewSession({ questions: initialQuestions, jobData: initial
   const [recordingFormat, setRecordingFormat] = useState<string>("audio/webm");
   const [interviewStage, setInterviewStage] = useState<"main" | "final">("main");
 
-  const currentQuestion = isFollowUp ? { text: followUpQuestion ?? "" } : questions[currentQuestionIndex];
+  const currentQuestion = isFollowUp
+    ? { text: followUpQuestion ?? "" }
+    : (questions[currentQuestionIndex] || { text: "Loading question..." });
 
   // Load audio recorder and enhance job data
   useEffect(() => {
