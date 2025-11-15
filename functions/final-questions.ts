@@ -16,6 +16,7 @@ interface ErrorResponse {
 
 const handler: Handler = async (event, context) => {
   try {
+    console.log('[Final Questions] Generating final interview questions...');
     const prompt = `
 You're a job interview expert generating the final two questions for an interview.
 
