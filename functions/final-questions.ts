@@ -84,12 +84,16 @@ Only return the two questions as plain text, numbered like this:
 
     const text = completion.content[0].text.trim();
     console.log("[Final Questions] Successfully extracted text, length:", text.length);
-    
+    console.log("[Final Questions] Raw text:", text);
+
     // Extract the two questions using regex
     const matches = text.match(/1\.\s*(.+)\s*2\.\s*(.+)/s);
-    
+
+    console.log("[Final Questions] Regex matches:", matches ? `Found ${matches.length} matches` : "No matches");
+
     if (!matches || matches.length < 3) {
-      console.log("Failed to parse questions from Claude response:", text);
+      console.log("[Final Questions] Failed to parse questions from Claude response");
+      console.log("[Final Questions] Text was:", text);
       
       // Provide better fallback questions
       return {
