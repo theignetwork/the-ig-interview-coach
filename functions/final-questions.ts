@@ -45,7 +45,19 @@ Only return the two questions as plain text, numbered like this:
       temperature: 0.8,
       messages: [{ role: "user", content: prompt }]
     });
-    
+
+    // Defensive check for response structure
+    if (!completion.content || !completion.content[0] || !completion.content[0].text) {
+      console.error("Unexpected API response structure:", JSON.stringify(completion));
+      return {
+        statusCode: 200,
+        body: JSON.stringify({
+          classic: "What would you say are your greatest strengths, and how do they align with this role?",
+          curveball: "What's a commonly held belief in your professional field that you think might be wrong, and why?"
+        } as FinalQuestionsResponse)
+      };
+    }
+
     const text = completion.content[0].text.trim();
     console.log("Claude response for final questions:", text);
     
