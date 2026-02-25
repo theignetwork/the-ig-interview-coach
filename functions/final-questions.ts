@@ -58,7 +58,7 @@ Only return the two questions as plain text, numbered like this:
 
     console.log('[Final Questions] Calling Anthropic API...');
     const completion = await anthropic.messages.create({
-      model: "claude-3-5-haiku-20241022",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 500, // Increased from 300 to ensure full response
       temperature: 0.8,
       messages: [{ role: "user", content: prompt }]

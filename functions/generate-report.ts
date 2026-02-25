@@ -82,7 +82,7 @@ Return your analysis in this JSON format:
     
     // Use a faster model for quicker responses
     const response = await anthropic.messages.create({
-      model: "claude-3-5-haiku-20241022",  // Using the latest Haiku model
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 1500,
       temperature: 0.2,
       messages: [{ role: "user", content: prompt }]
